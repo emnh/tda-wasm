@@ -246,6 +246,11 @@ int main()
 
     GLint u_time = glGetUniformLocation(shaderProgram, "u_time");
     GLint u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
+
+    // Create vertex array object
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
     
     // Create a Vertex Buffer Object and copy the vertex data to it
     GLuint vbo;
@@ -270,7 +275,6 @@ int main()
 
     // Specify the layout of the vertex uvs 
     GLint uvAttrib = glGetAttribLocation(shaderProgram, "uv");
-    cerr << "uvAttrib: " << uvAttrib << endl;
     glEnableVertexAttribArray(uvAttrib);
     glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
 
@@ -286,6 +290,38 @@ int main()
     // Accept fragment if it closer to the camera than the former one
     glDepthFunc(GL_LESS);
 
+    // TEXTURE
+    
+    int imgWidth;
+    int imgHeight;
+    char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
+    //cerr << "imageData: " << (int) imageData << " " << imgWidth << " " << imgHeight << endl;
+    
+    // Create one OpenGL texture
+    GLuint textureID;
+    glGenTextures(1, &textureID);
+
+    // "Bind" the newly created texture : all future texture functions will modify this texture
+    glBindTexture(GL_TEXTURE_2D, textureID);
+    //cerr << "textureID: " << textureID << endl;
+
+    // Give the image to OpenGL
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+
+    // Texture parameters
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+
+    // When MAGnifying the image (no bigger mipmap available), use LINEAR filtering
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // When MINifying the image, use a LINEAR blend of two mipmaps, each filtered LINEARLY too
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    // Generate mipmaps, by the way.
+    glGenerateMipmap(GL_TEXTURE_2D);
+    
+    // Get texture uniform
+    GLint u_tex = glGetUniformLocation(shaderProgram, "u_tex");
+
     loop = [&]
     {
         // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -293,6 +329,9 @@ int main()
         double elapsed = (emscripten_get_now() - startTime) / 1000.0;
 
         glUniform1f(u_time, elapsed);
+        glUniform1i(u_tex, textureID);
+        glActiveTexture(GL_TEXTURE0 + textureID);
+        glBindTexture(GL_TEXTURE_2D, textureID);
 
         glm::vec2 rotate(sin(elapsed), 0.0);
         glm::mat4 camera = getCamera(3.0 + sin(elapsed), rotate);

@@ -2,6 +2,7 @@
 
 precision mediump float;
 uniform float u_time;
+uniform sampler2D u_tex;
 in vec2 v_uv;
 
 out vec4 fragmentColor;
@@ -32,7 +33,7 @@ void main3( void ) {
 
 }
 
-void main()
+void main4()
 {
   vec2 resolution = vec2(640.0);
   float time = u_time;
@@ -51,7 +52,8 @@ void main()
 	gl_FragColor=vec4(col, 1.0);
 }
 
-void main4() {
-  vec3 col = vec3(v_uv.xy, 0.0);
-  gl_FragColor = vec4(col, 1.0);
+void main() {
+  //vec3 col = vec3(v_uv.xy, 0.0);
+  //gl_FragColor = vec4(col, 1.0);
+  gl_FragColor = texture(u_tex, v_uv);
 }
