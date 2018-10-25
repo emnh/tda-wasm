@@ -1,5 +1,12 @@
+#version 300 es
+
 precision mediump float;
 uniform float u_time;
+in vec2 v_uv;
+
+out vec4 fragmentColor;
+
+#define gl_FragColor fragmentColor
 
 void main2()
 {
@@ -30,7 +37,8 @@ void main()
   vec2 resolution = vec2(640.0);
   float time = u_time;
 
-	vec2 p=(2.0*gl_FragCoord.xy-resolution)/max(resolution.x,resolution.y);
+  vec2 p = v_uv.xy;
+	//vec2 p=(2.0*gl_FragCoord.xy-resolution)/max(resolution.x,resolution.y);
 	for(int i=1;i<50;i++)
 	{
 		vec2 newp=p;
@@ -43,3 +51,7 @@ void main()
 	gl_FragColor=vec4(col, 1.0);
 }
 
+void main4() {
+  vec3 col = vec3(v_uv.xy, 0.0);
+  gl_FragColor = vec4(col, 1.0);
+}

@@ -4,28 +4,20 @@
 <head>
     <meta charset="utf-8">
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+<style>
+body {
+  margin: 0px;
+  padding: 0px;
+  overflow: hidden;
+}
+</style>
 </head>
 
 <body>
-
     <!-- Create the canvas that the C++ code will draw into -->
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
-
-    <script type='text/javascript'>
-        var canv = document.getElementById('canvas');
-        canv.width = 640;
-        canv.height = 640;
-    </script>
-
+    <script src="ui.js"></script>
     <script src="index.js"></script>
-
-    <script type='text/javascript'>
-        canv.addEventListener('click',    _toggle_background_color, false);
-        canv.addEventListener('touchend', _toggle_background_color, false);
-    </script>
-
     <p>Click the canvas to change the background color.</p>
-
 </body>
-
 </html>
