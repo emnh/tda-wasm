@@ -1,6 +1,10 @@
 #include <functional>
 #include <vector>
 #include <iostream>
+#include <string>
+#include <cstring>
+#include <fstream>
+#include <streambuf>
 
 #include <emscripten.h>
 #include <emscripten/html5.h>
@@ -10,25 +14,6 @@
 
 using namespace std;
 
-// Shader sources
-const GLchar* vertexSource =
-    "precision mediump float;\n"
-    "attribute vec4 position;                     \n"
-    "uniform float u_time;\n"
-    "void main()                                  \n"
-    "{                                            \n"
-    "  gl_Position = vec4(position.xyz, 1.0);     \n"
-    "}                                            \n";
-const GLchar* fragmentSource =
-    "precision mediump float;\n"
-    "uniform float u_time;\n"
-    "void main()                                  \n"
-    "{                                            \n"
-    "  gl_FragColor.r = gl_FragCoord.x/640.0;    \n"
-    "  gl_FragColor.g = gl_FragCoord.y/480.0;    \n"
-    "  gl_FragColor.b = (sin(5.0 * u_time) + 1.0) / 2.0;                     \n"
-    "}                                            \n";
-
 // an example of something we will control from the javascript side
 bool background_is_black = true;
 
@@ -37,6 +22,17 @@ extern "C" void EMSCRIPTEN_KEEPALIVE toggle_background_color() { background_is_b
 
 std::function<void()> loop;
 void main_loop() { loop(); }
+
+void readFile(const char* fname, string& str) {
+	std::ifstream t(fname);
+
+	t.seekg(0, std::ios::end);
+	str.reserve(t.tellg());
+	t.seekg(0, std::ios::beg);
+
+	str.assign((std::istreambuf_iterator<char>(t)),
+							std::istreambuf_iterator<char>());
+}
 
 void checkShaderError(GLuint shader) {
   GLint isCompiled = 0;
@@ -110,6 +106,13 @@ int main()
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	
+		std::string* vertexSourceStr = new string();
+		readFile("shaders/vertex.glsl", *vertexSourceStr);
+		const char* vertexSource = vertexSourceStr->c_str();
+		std::string* fragmentSourceStr = new string();
+		readFile("shaders/fragment.glsl", *fragmentSourceStr);
+		const char* fragmentSource = fragmentSourceStr->c_str();
 
     // Create and compile the vertex shader
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
