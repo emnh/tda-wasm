@@ -102,7 +102,12 @@ int main()
     GLuint vbo;
     glGenBuffers(1, &vbo);
 
-    GLfloat vertices[] = {0.0f, 0.5f, 0.5f, -0.5f, -0.5f, -0.5f};
+    const GLfloat x = 0.5f;
+    const GLfloat y = 0.5f;
+    GLfloat vertices[] = {
+      0.0f, y, 0.0f, -y, -x, -y,
+      -x, y, -x, -y, 0.0f, y
+    };
 
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
@@ -118,7 +123,6 @@ int main()
     GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexSource, nullptr);
     glCompileShader(vertexShader);
-    cerr << "checking error" << endl;
     checkShaderError(vertexShader);
 
     // Create and compile the fragment shader
@@ -146,13 +150,11 @@ int main()
 
     loop = [&]
     {
-        // move a vertex
-        glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
         double elapsed = (emscripten_get_now() - startTime) / 1000.0;
 
         glUniform1f(u_time, elapsed);
 
-        // Clear the screen
         if( background_is_black ) {
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         } else {
@@ -160,8 +162,7 @@ int main()
         }
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Draw a triangle from the 3 vertices
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
