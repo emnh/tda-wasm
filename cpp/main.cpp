@@ -26,6 +26,18 @@ bool background_is_black = true;
 float width = 1.0;
 float height = 1.0;
 
+class State {
+public:
+  bool movingDown = false;
+  bool movingUp = false;
+  bool movingLeft = false;
+  bool movingRight = false;
+  double pitch;
+  double yaw;
+};
+
+State state;
+
 // the function called by the javascript code
 extern "C" void EMSCRIPTEN_KEEPALIVE toggle_background_color() { background_is_black = !background_is_black; }
 
@@ -35,100 +47,40 @@ setSize(float w, float h) {
   height = h;
 }
 
+extern "C" void EMSCRIPTEN_KEEPALIVE
+moveDown(bool on) {
+  state.movingDown = on;
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE
+moveUp(bool on) {
+  state.movingUp = on;
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE
+moveLeft(bool on) {
+  state.movingLeft = on;
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE
+moveRight(bool on) {
+  state.movingRight = on;
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE
+addYawPitch(double yaw, double pitch) {
+  state.yaw += yaw;
+  state.pitch += pitch;
+  if (state.pitch > 89.0f) {
+    state.pitch = 89.0f;
+  }
+  if (state.pitch < -89.0f) {
+    state.pitch = -89.0f;
+  }
+}
+
 std::function<void()> loop;
 void main_loop() { loop(); }
-
-// Our vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
-// A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
-static const GLfloat cubeData2[] = {
-    -1.0f,-1.0f,-1.0f, // triangle 1 : begin
-    -1.0f,-1.0f, 1.0f,
-    -1.0f, 1.0f, 1.0f, // triangle 1 : end
-    1.0f, 1.0f,-1.0f, // triangle 2 : begin
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f,-1.0f, // triangle 2 : end
-    1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f, 1.0f,
-    -1.0f,-1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    -1.0f,-1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f,-1.0f,
-    1.0f,-1.0f,-1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f,-1.0f,
-    -1.0f, 1.0f,-1.0f,
-    1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f,-1.0f,
-    -1.0f, 1.0f, 1.0f,
-    1.0f, 1.0f, 1.0f,
-    -1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f
-};
-
-static const GLfloat cubeUVs2[] = {
-    0.000059f, 1.0f-0.000004f,
-    0.000103f, 1.0f-0.336048f,
-    0.335973f, 1.0f-0.335903f,
-    1.000023f, 1.0f-0.000013f,
-    0.667979f, 1.0f-0.335851f,
-    0.999958f, 1.0f-0.336064f,
-    0.667979f, 1.0f-0.335851f,
-    0.336024f, 1.0f-0.671877f,
-    0.667969f, 1.0f-0.671889f,
-    1.000023f, 1.0f-0.000013f,
-    0.668104f, 1.0f-0.000013f,
-    0.667979f, 1.0f-0.335851f,
-    0.000059f, 1.0f-0.000004f,
-    0.335973f, 1.0f-0.335903f,
-    0.336098f, 1.0f-0.000071f,
-    0.667979f, 1.0f-0.335851f,
-    0.335973f, 1.0f-0.335903f,
-    0.336024f, 1.0f-0.671877f,
-    1.000004f, 1.0f-0.671847f,
-    0.999958f, 1.0f-0.336064f,
-    0.667979f, 1.0f-0.335851f,
-    0.668104f, 1.0f-0.000013f,
-    0.335973f, 1.0f-0.335903f,
-    0.667979f, 1.0f-0.335851f,
-    0.335973f, 1.0f-0.335903f,
-    0.668104f, 1.0f-0.000013f,
-    0.336098f, 1.0f-0.000071f,
-    0.000103f, 1.0f-0.336048f,
-    0.000004f, 1.0f-0.671870f,
-    0.336024f, 1.0f-0.671877f,
-    0.000103f, 1.0f-0.336048f,
-    0.336024f, 1.0f-0.671877f,
-    0.335973f, 1.0f-0.335903f,
-    0.667969f, 1.0f-0.671889f,
-    1.000004f, 1.0f-0.671847f,
-    0.667979f, 1.0f-0.335851f
-};
-
-
-
-glm::mat4 getCamera(float Translate, glm::vec2 const & Rotate)
-{
-  glm::mat4 Projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 100.f);
-  glm::mat4 View = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -Translate));
-  View = glm::rotate(View, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));
-  View = glm::rotate(View, Rotate.x, glm::vec3(0.0f, 1.0f, 0.0f));
-  glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
-  return Projection * View * Model;
-}
 
 void readFile(const char* fname, string& str) {
 	std::ifstream t(fname);
@@ -247,6 +199,52 @@ Geometry loadGeometry() {
   return geometry;
 }
 
+class Camera {
+public:
+  glm::vec3 cameraPos   = glm::vec3(0.0f, 1.0f,  0.0f);
+  glm::vec3 cameraFront = glm::vec3(0.0f, -1.0f,  0.0f);
+  glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+
+  glm::mat4 getView() {
+    return glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
+  }
+
+  glm::mat4 getMVP(float Translate, glm::vec2 const & Rotate)
+  {
+    glm::mat4 Projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 100.f);
+    /*
+    glm::mat4 View = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -Translate));
+    View = glm::rotate(View, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));
+    View = glm::rotate(View, Rotate.x, glm::vec3(0.0f, 1.0f, 0.0f));
+    */
+    glm::mat4 View = getView();
+    glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
+    return Projection * View * Model;
+  }
+
+  void update(double tick) {
+    glm::vec3 front;
+    front.x = cos(glm::radians(state.pitch)) * cos(glm::radians(state.yaw));
+    front.y = sin(glm::radians(state.pitch));
+    front.z = cos(glm::radians(state.pitch)) * sin(glm::radians(state.yaw));
+    cameraFront = glm::normalize(front);
+
+    float cameraSpeed = 5.0f * tick; // adjust accordingly
+    if (state.movingDown) {
+        cameraPos -= cameraSpeed * cameraFront;
+    }
+    if (state.movingUp) {
+        cameraPos += cameraSpeed * cameraFront;
+    }
+    if (state.movingLeft) {
+        cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    }
+    if (state.movingRight) {
+        cameraPos += glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
+    }
+  }
+};
+
 int main()
 {
     EM_ASM(UI.allReady());
@@ -352,8 +350,6 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
 
-    double startTime = emscripten_get_now();
-
     // Enable depth test
     glEnable(GL_DEPTH_TEST);
     // Accept fragment if it closer to the camera than the former one
@@ -391,11 +387,22 @@ int main()
     // Get texture uniform
     GLint u_tex = glGetUniformLocation(shaderProgram, "u_tex");
 
+    // Misc loop vars
+    double startTime = emscripten_get_now();
+    double lastTime = startTime;
+    Camera camera;
+
     loop = [&]
     {
         // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+        double now = emscripten_get_now();
+        double tick = (now - lastTime) / 1000.0;
+        lastTime = now;
+        double elapsed = (now - startTime) / 1000.0;
+
+        camera.update(tick);
+
         glViewport(0, 0, width, height);
-        double elapsed = (emscripten_get_now() - startTime) / 1000.0;
 
         glUniform1f(u_time, elapsed);
         glUniform1i(u_tex, textureID);
@@ -403,8 +410,8 @@ int main()
         glBindTexture(GL_TEXTURE_2D, textureID);
 
         glm::vec2 rotate(0.0, M_PI * 3.0 / 4.0); // + (M_PI / 4.0) * (sin(elapsed) + 1.0) / 2.0);
-        glm::mat4 camera = getCamera(1.0, rotate);
-        glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(camera));
+        glm::mat4 mvp = camera.getMVP(1.0, rotate);
+        glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
         if( background_is_black ) {
             glClearColor(0.0f, 0.0f, 0.0f, 1.0f);

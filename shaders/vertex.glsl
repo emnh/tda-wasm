@@ -131,8 +131,8 @@ void main()
   float dy = getHeight(c + vec2(0.0, delta)) - getHeight(c - vec2(0.0, delta));
   vec3 nor = normalize(vec3(dx, 2.0 * delta, dy));
 
-  pos = rotate(pos, vec3(0.0, 1.0, 1.0), sin(theta));
-  v_nor = rotate(nor, vec3(0.0, 1.0, 1.0), sin(theta));
+  //pos = rotate(pos, vec3(0.0, 1.0, 1.0), sin(theta));
+  //v_nor = rotate(nor, vec3(0.0, 1.0, 1.0), sin(theta));
   gl_Position = u_mvp * vec4(pos, 1.0);
   //gl_Position = vec4(pos, 1.0);
 }
