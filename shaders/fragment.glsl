@@ -10,6 +10,10 @@ out vec4 fragmentColor;
 
 #define gl_FragColor fragmentColor
 
+float rand(vec2 co){
+  return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
+}
+
 void main2()
 {
   gl_FragColor.r = gl_FragCoord.x / 640.0;
@@ -60,5 +64,8 @@ void main() {
   //float dy = getHeight(v_pos.xy + vec2(0.0, delta)) - getHeight(v_pos.xy);
   vec3 light = normalize(vec3(1.0, 1.0, 1.0));
   float diffuse = dot(light, v_nor) + 1.0;
-  gl_FragColor = texture(u_tex, 10.0 * v_uv) * diffuse;
+  vec4 col1 = texture(u_tex, 10.0 * v_uv);
+  //vec4 col2 = texture(u_tex, vec2(rand(v_uv), rand(-v_uv)));
+  vec4 col2 = texture(u_tex, v_uv);
+  gl_FragColor = mix(col1, col2, 0.5) * diffuse;
 }

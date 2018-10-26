@@ -198,8 +198,6 @@ const handleMouseEnterLeave = function(evt) {
 
 function allReady() {
   resize();
-  canv.addEventListener('click',    _toggle_background_color, false);
-  canv.addEventListener('touchend', _toggle_background_color, false);
   window.addEventListener("optimizedResize", resize);
   window.addEventListener("keydown", handleKeyDown, true);
   window.addEventListener("keyup", handleKeyUp, true);

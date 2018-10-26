@@ -21,13 +21,10 @@
 
 using namespace std;
 
-// an example of something we will control from the javascript side
-bool background_is_black = true;
-float width = 1.0;
-float height = 1.0;
-
 class State {
 public:
+  float width = 1.0;
+  float height = 1.0;
   bool movingDown = false;
   bool movingUp = false;
   bool movingLeft = false;
@@ -39,13 +36,10 @@ public:
 
 State state;
 
-// the function called by the javascript code
-extern "C" void EMSCRIPTEN_KEEPALIVE toggle_background_color() { background_is_black = !background_is_black; }
-
 extern "C" void EMSCRIPTEN_KEEPALIVE
 setSize(float w, float h) {
-  width = w;
-  height = h;
+  state.width = w;
+  state.height = h;
 }
 
 extern "C" void EMSCRIPTEN_KEEPALIVE
@@ -221,14 +215,9 @@ public:
     return glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
   }
 
-  glm::mat4 getMVP(float Translate, glm::vec2 const & Rotate)
+  glm::mat4 getMVP()
   {
-    glm::mat4 Projection = glm::perspective(glm::radians(state.fov), width / height, 0.1f, 100.f);
-    /*
-    glm::mat4 View = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -Translate));
-    View = glm::rotate(View, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));
-    View = glm::rotate(View, Rotate.x, glm::vec3(0.0f, 1.0f, 0.0f));
-    */
+    glm::mat4 Projection = glm::perspective(glm::radians(state.fov), state.width / state.height, 0.1f, 100.f);
     glm::mat4 View = getView();
     glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
     return Projection * View * Model;
@@ -406,7 +395,6 @@ int main()
 
     loop = [&]
     {
-        // glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
         double now = emscripten_get_now();
         double tick = (now - lastTime) / 1000.0;
         lastTime = now;
@@ -414,22 +402,17 @@ int main()
 
         camera.update(tick);
 
-        glViewport(0, 0, width, height);
+        glViewport(0, 0, state.width, state.height);
 
         glUniform1f(u_time, elapsed);
         glUniform1i(u_tex, textureID);
         glActiveTexture(GL_TEXTURE0 + textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
 
-        glm::vec2 rotate(0.0, M_PI * 3.0 / 4.0); // + (M_PI / 4.0) * (sin(elapsed) + 1.0) / 2.0);
-        glm::mat4 mvp = camera.getMVP(1.0, rotate);
+        glm::mat4 mvp = camera.getMVP();
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
-        if( background_is_black ) {
-            glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-        } else {
-            glClearColor(0.9f, 0.9f, 0.9f, 1.0f);
-        }
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
