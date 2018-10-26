@@ -32,8 +32,9 @@ public:
   bool movingUp = false;
   bool movingLeft = false;
   bool movingRight = false;
-  double pitch;
-  double yaw;
+  float fov = 45.0;
+  double pitch = 0.0;
+  double yaw = 0.0;;
 };
 
 State state;
@@ -76,6 +77,17 @@ addYawPitch(double yaw, double pitch) {
   }
   if (state.pitch < -89.0f) {
     state.pitch = -89.0f;
+  }
+}
+
+extern "C" void EMSCRIPTEN_KEEPALIVE
+addZoom(double fov) {
+  state.fov += fov;
+  if (state.fov > 45.0f) {
+    state.fov = 45.0f;
+  }
+  if (state.fov < 1.0f) {
+    state.fov = 1.0f;
   }
 }
 
@@ -211,7 +223,7 @@ public:
 
   glm::mat4 getMVP(float Translate, glm::vec2 const & Rotate)
   {
-    glm::mat4 Projection = glm::perspective(glm::radians(45.0f), width / height, 0.1f, 100.f);
+    glm::mat4 Projection = glm::perspective(glm::radians(state.fov), width / height, 0.1f, 100.f);
     /*
     glm::mat4 View = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, -Translate));
     View = glm::rotate(View, Rotate.y, glm::vec3(-1.0f, 0.0f, 0.0f));

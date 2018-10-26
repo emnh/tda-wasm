@@ -209,5 +209,8 @@ function allReady() {
   canv.addEventListener("mousedown", function(evt) {
     canv.requestPointerLock();
   }, true);
+  canv.addEventListener("wheel", function(evt) {
+    _addZoom(evt.deltaY * 45.0 / (100.0 * 20.0));
+  }, true);
 }
 window.UI.allReady = allReady;
