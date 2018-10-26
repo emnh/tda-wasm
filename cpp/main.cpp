@@ -40,7 +40,7 @@ void main_loop() { loop(); }
 
 // Our vertices. Three consecutive floats give a 3D vertex; Three consecutive vertices give a triangle.
 // A cube has 6 faces with 2 triangles each, so this makes 6*2=12 triangles, and 12*3 vertices
-static const GLfloat cubeData[] = {
+static const GLfloat cubeData2[] = {
     -1.0f,-1.0f,-1.0f, // triangle 1 : begin
     -1.0f,-1.0f, 1.0f,
     -1.0f, 1.0f, 1.0f, // triangle 1 : end
@@ -79,7 +79,7 @@ static const GLfloat cubeData[] = {
     1.0f,-1.0f, 1.0f
 };
 
-static const GLfloat cubeUVs[] = {
+static const GLfloat cubeUVs2[] = {
     0.000059f, 1.0f-0.000004f,
     0.000103f, 1.0f-0.336048f,
     0.335973f, 1.0f-0.335903f,
@@ -191,9 +191,71 @@ void checkLinkError(GLuint program) {
   }
 }
 
+class Geometry {
+public:
+  int count;
+  int indexCount;
+  GLfloat* position;
+  GLfloat* uv;
+  GLfloat* normal;
+  GLint* index;
+
+  Geometry() {
+    count = 0;
+    indexCount = 0;
+    position = NULL;
+    uv = NULL;
+    normal = NULL;
+    index = NULL;
+  }
+
+};
+
+Geometry loadGeometry() {
+  Geometry geometry;
+  geometry.count =
+    EM_ASM_INT({
+          return UI.getPositionCount();
+        });
+  geometry.indexCount =
+    EM_ASM_INT({
+          return UI.getIndexCount();
+        });
+  geometry.position =
+    (GLfloat*)
+    EM_ASM_INT({
+          return UI.getPosition();
+        });
+  geometry.index =
+    (GLint*)
+    EM_ASM_INT({
+          return UI.getIndex();
+        });
+  geometry.uv =
+    (GLfloat*)
+    EM_ASM_INT({
+          return UI.getUV();
+        });
+  /*
+  for (int i = 0; i < geometry.count * 3; i++) {
+    cerr << "pos: " << geometry.position[i] << endl;
+  }
+  for (int i = 0; i < geometry.indexCount * 3; i++) {
+    cerr << "pos: " << geometry.index[i] << endl;
+  }
+  */
+  return geometry;
+}
+
 int main()
 {
-    EM_ASM(allReady());
+    EM_ASM(UI.allReady());
+    Geometry geometry = loadGeometry();
+    GLfloat* cubeData = geometry.position;
+    GLfloat* cubeUVs = geometry.uv;
+    GLint* index = geometry.index;
+    cerr << "positionCount: " << geometry.count << endl;
+    cerr << "indexCount: " << geometry.indexCount << endl;
 
     // Context configurations
     EmscriptenWebGLContextAttributes attrs;
@@ -258,32 +320,39 @@ int main()
 
     // Upload position data
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeData), cubeData, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, geometry.count * 3 * sizeof(GLfloat), cubeData, GL_STATIC_DRAW);
 
     // Specify the layout of the vertex position data
     GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
     glEnableVertexAttribArray(posAttrib);
     glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    
+
     // Create a Vertex Buffer Object and copy the vertex data to it
     GLuint vboUV;
     glGenBuffers(1, &vboUV);
     
     // Upload UV data
     glBindBuffer(GL_ARRAY_BUFFER, vboUV);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(cubeUVs), cubeUVs, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, geometry.count * 2 * sizeof(GLfloat), cubeUVs, GL_STATIC_DRAW);
 
     // Specify the layout of the vertex uvs 
     GLint uvAttrib = glGetAttribLocation(shaderProgram, "uv");
     glEnableVertexAttribArray(uvAttrib);
     glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    
+    // Index
+    GLuint vindex;
+    glGenBuffers(1, &vindex);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER, geometry.indexCount * 3 * sizeof(GLint), geometry.index, GL_STATIC_DRAW);
+    
 
     // Bind main buffer again for drawing
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
 
     double startTime = emscripten_get_now();
-
-    int vertexCount = sizeof(cubeData) / (sizeof(GLfloat) * 3);
 
     // Enable depth test
     glEnable(GL_DEPTH_TEST);
@@ -344,7 +413,7 @@ int main()
         }
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);

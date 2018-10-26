@@ -1,3 +1,56 @@
+window.UI = {};
+
+
+const THREE = require('three');
+
+const mainGeometry = new THREE.BoxBufferGeometry(1, 1, 1, 1);
+
+console.log("mainGeometry", mainGeometry);
+
+function getFloatArray(ar) {
+  const fsz = 4;
+  const size = ar.length;
+  const offset = Module._malloc(size * fsz);
+  const doublePtr = Module.HEAPF32.subarray(offset / fsz, offset / fsz + size);
+  for (let i = 0; i < size; i++) {
+    doublePtr[i] = ar[i];
+  }
+  return offset;
+}
+
+function getIntArray(ar) {
+  const fsz = 4;
+  const size = ar.length;
+  const offset = Module._malloc(size * fsz);
+  const intPtr = Module.HEAP32.subarray(offset / fsz, offset / fsz + size);
+  for (let i = 0; i < size; i++) {
+    intPtr[i] = ar[i];
+  }
+  return offset;
+}
+
+window.UI.getPositionCount = function() {
+  const size = mainGeometry.attributes.position.count;
+  return size;
+}
+
+window.UI.getIndexCount = function() {
+  return mainGeometry.index.array.length / 3;
+};
+
+window.UI.getPosition = function() {
+  return getFloatArray(mainGeometry.attributes.position.array);
+};
+
+window.UI.getUV = function() {
+  return getFloatArray(mainGeometry.attributes.uv.array);
+};
+
+
+window.UI.getIndex = function() {
+  return getIntArray(mainGeometry.index.array);
+};
+
 (function() {
     var throttle = function(type, name, obj) {
         obj = obj || window;
@@ -35,3 +88,4 @@ function allReady() {
   canv.addEventListener('touchend', _toggle_background_color, false);
   window.addEventListener("optimizedResize", resize);
 }
+window.UI.allReady = allReady;

@@ -1,0 +1,25 @@
+{
+  "name": "tda-wasm",
+  "version": "1.0.0",
+  "description": "Tower Defense: Analysis",
+  "main": "dist/index.html",
+  "scripts": {
+    "webpack": "webpack",
+    "watch": "webpack -w"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/emnh/tda-wasm.git"
+  },
+  "author": "Eivind Magnus Hvidevold",
+  "license": "GPL-3.0",
+  "bugs": {
+    "url": "https://github.com/emnh/tda-wasm/issues"
+  },
+  "homepage": "https://github.com/emnh/tda-wasm#readme",
+  "devDependencies": {
+    "three": "^0.97.0",
+    "webpack": "^4.23.1",
+    "webpack-cli": "^3.1.2"
+  }
+}

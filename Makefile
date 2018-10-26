@@ -1,5 +1,5 @@
 
-all: dist/index.js dist/index.html dist/ui.js
+all: dist/index.js dist/index.html
 
 clean:
 	rm dist/index.js dist/index.wasm dist/index.html
@@ -7,8 +7,8 @@ clean:
 dist/index.html: src/index.html
 	cp src/index.html dist/index.html
 
-dist/ui.js: src/ui.js
-	cp src/ui.js dist/ui.js
+#dist/ui.js: src/ui.js
+#	cp src/ui.js dist/ui.js
 
 dist/index.js: cpp/main.cpp shaders/* images/*
 	emcc -Icpp/glm cpp/main.cpp \
