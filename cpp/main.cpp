@@ -254,8 +254,8 @@ int main()
     GLfloat* cubeData = geometry.position;
     GLfloat* cubeUVs = geometry.uv;
     GLint* index = geometry.index;
-    cerr << "positionCount: " << geometry.count << endl;
-    cerr << "indexCount: " << geometry.indexCount << endl;
+    //cerr << "positionCount: " << geometry.count << endl;
+    //cerr << "indexCount: " << geometry.indexCount << endl;
 
     // Context configurations
     EmscriptenWebGLContextAttributes attrs;
@@ -402,8 +402,8 @@ int main()
         glActiveTexture(GL_TEXTURE0 + textureID);
         glBindTexture(GL_TEXTURE_2D, textureID);
 
-        glm::vec2 rotate(sin(elapsed), 0.0);
-        glm::mat4 camera = getCamera(3.0 + sin(elapsed), rotate);
+        glm::vec2 rotate(0.0, M_PI * 3.0 / 4.0); // + (M_PI / 4.0) * (sin(elapsed) + 1.0) / 2.0);
+        glm::mat4 camera = getCamera(1.0, rotate);
         glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(camera));
 
         if( background_is_black ) {

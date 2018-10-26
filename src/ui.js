@@ -3,7 +3,7 @@ window.UI = {};
 
 const THREE = require('three');
 
-const mainGeometry = new THREE.BoxBufferGeometry(1, 1, 1, 1);
+const mainGeometry = new THREE.PlaneBufferGeometry(10, 10, 256, 256);
 
 console.log("mainGeometry", mainGeometry);
 
