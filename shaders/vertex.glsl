@@ -126,7 +126,7 @@ float getHeight(vec2 pos) {
     * 0.00025
     + snoise(pos * 20.0)
     * 0.01;
-  return value * 100.0;
+  return value * 50.0;
   //return 0.1 * snoise(2.0 * pos.xy);
 }
 

@@ -12,6 +12,8 @@ dist/index.html: src/index.html
 
 dist/index.js: cpp/main.cpp shaders/* images/*
 	emcc -Icpp/glm cpp/main.cpp \
-		-std=c++17 -s WASM=1 -s USE_WEBGL2=1 --preload-file images/ --preload-file shaders/ \
-		--use-preload-plugins \
+		-std=c++17 -s WASM=1 -s USE_WEBGL2=1 -s ALLOW_MEMORY_GROWTH=1 \
+		-s TOTAL_MEMORY=128MB \
+		--preload-file images/ --preload-file shaders/ \
+		--use-preload-plugins --no-heap-copy \
 		-o dist/index.js

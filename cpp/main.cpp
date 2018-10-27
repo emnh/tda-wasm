@@ -32,6 +32,7 @@ public:
   float fov = 45.0;
   double pitch = -89.0;
   double yaw = 0.0;;
+  int numTextures = 0;
 };
 
 State state;
@@ -162,8 +163,8 @@ Geometry loadGeometry() {
 
 class Camera {
 public:
-  glm::vec3 cameraPos   = glm::vec3(0.0f, 20.0f,  0.0f);
-  glm::vec3 cameraFront = glm::vec3(0.0f, -1.0f,  0.0f);
+  glm::vec3 cameraPos   = glm::vec3(0.0f, 10.0f,  0.0f);
+  glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f,  0.0f);
   glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
   glm::mat4 getView() {
@@ -172,7 +173,7 @@ public:
 
   glm::mat4 getMVP()
   {
-    glm::mat4 Projection = glm::perspective(glm::radians(state.fov), state.width / state.height, 0.1f, 100.f);
+    glm::mat4 Projection = glm::perspective(glm::radians(state.fov), state.width / state.height, 0.1f, 100000.f);
     glm::mat4 View = getView();
     glm::mat4 Model = glm::scale(glm::mat4(1.0f), glm::vec3(0.5f));
     return Projection * View * Model;
@@ -222,6 +223,7 @@ public:
   GLint u_mvp;
   GLint u_tex;
   GLuint textureID;
+  GLuint activeTextureID;
 
   void update(UniformArgs uniformArgs) {
     // uniformArgs.light.x = cos(uniformArgs.elapsed);
@@ -230,13 +232,14 @@ public:
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
-    glUniform1i(u_tex, textureID);
+    glUniform1i(u_tex, activeTextureID);
     glm::mat4 mvp = uniformArgs.camera.getMVP();
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
     // Activate texture
-    glActiveTexture(GL_TEXTURE0 + textureID);
-    glBindTexture(GL_TEXTURE_2D, textureID);
+    // cerr << "activating tex: " << activeTextureID << " with " << textureID << endl;
+    // glActiveTexture(GL_TEXTURE0 + activeTextureID);
+    // glBindTexture(GL_TEXTURE_2D, textureID);
   }
 
   void init() {
@@ -272,13 +275,14 @@ public:
     u_time = glGetUniformLocation(shaderProgram, "u_time");
     u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
+    // Get texture uniform
+    u_tex = glGetUniformLocation(shaderProgram, "u_tex");
     
     // Initialize texture
     initTexture();
   }
   
-  void initTexture() {
-    // TEXTURE
+  virtual void initTexture() {
     int imgWidth;
     int imgHeight;
     char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
@@ -288,6 +292,9 @@ public:
     glGenTextures(1, &textureID);
 
     // "Bind" the newly created texture : all future texture functions will modify this texture
+    activeTextureID = state.numTextures;
+    glActiveTexture(GL_TEXTURE0 + activeTextureID);
+    state.numTextures++;
     glBindTexture(GL_TEXTURE_2D, textureID);
     //cerr << "textureID: " << textureID << endl;
 
@@ -304,9 +311,6 @@ public:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     // Generate mipmaps, by the way.
     glGenerateMipmap(GL_TEXTURE_2D);
-    
-    // Get texture uniform
-    u_tex = glGetUniformLocation(shaderProgram, "u_tex");
   }
 
 
@@ -360,6 +364,45 @@ public:
     }
   }
 };
+
+class CubeMaterial : public Material {
+  virtual void initTexture() {
+    const char* images[] = {
+      "images/Box_Right.jpg",
+      "images/Box_Left.jpg",
+      "images/Box_Top.jpg",
+      "images/Box_Bottom.jpg",
+      "images/Box_Front.jpg",
+      "images/Box_Back.jpg"
+    };
+    GLint targets[] = {
+       GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 
+    };
+    glGenTextures(1, &textureID);
+    activeTextureID = state.numTextures;
+    glActiveTexture(GL_TEXTURE0 + activeTextureID);
+    cerr << "cube active: " << activeTextureID << endl;
+    state.numTextures++;
+    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    for (int j = 0; j < 6; j++) {
+        int imgWidth;
+        int imgHeight;
+        char* imageData = emscripten_get_preloaded_image_data(images[j], &imgWidth, &imgHeight);
+        // cerr << "imgsize: " << imgWidth << " " << imgHeight << endl;
+        glTexImage2D(targets[j], 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    //glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+  }
+};
+
 
 class Mesh {
 public:
@@ -460,16 +503,15 @@ int main()
     // Create geometry
     EM_ASM({
           const THREE = window.UI.THREE;
-          window.UI.geometry = new THREE.PlaneBufferGeometry(100, 100, 256, 256);
+          var sz = 100.0;
+          window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
         });
     Geometry geometry = loadGeometry();
     
     // Create material
     Material material;
-    const char* vertexSourceFile = "shaders/vertex.glsl";
-    material.vertexSourceFile = vertexSourceFile;
-    const char* fragmentSourceFile = "shaders/fragment.glsl";
-    material.fragmentSourceFile = fragmentSourceFile;
+    material.vertexSourceFile = "shaders/vertex.glsl";
+    material.fragmentSourceFile = "shaders/fragment.glsl";
     material.init();
 
     // Create mesh
@@ -487,10 +529,8 @@ int main()
     
     // Create material
     Material material2;
-    const char* vertexSourceFile2 = "shaders/defaultVertex.glsl";
-    material2.vertexSourceFile = vertexSourceFile2;
-    const char* fragmentSourceFile2 = "shaders/defaultFragment.glsl";
-    material2.fragmentSourceFile = fragmentSourceFile2;
+    material2.vertexSourceFile = "shaders/defaultVertex.glsl";
+    material2.fragmentSourceFile = "shaders/defaultFragment.glsl";
     material2.init();
 
     // Create mesh
@@ -498,6 +538,26 @@ int main()
     sphere.geometry = geometry2;
     sphere.material = material2;
     sphere.init();
+
+    // Create another geometry
+    EM_ASM({
+          const THREE = window.UI.THREE;
+          var sz = 100000.0;
+          window.UI.geometry = new THREE.BoxBufferGeometry(sz, sz, sz, 1, 1, 1);
+        });
+    Geometry geometry3 = loadGeometry();
+    
+    // Create material
+    CubeMaterial material3;
+    material3.vertexSourceFile = "shaders/skyVertex.glsl";
+    material3.fragmentSourceFile = "shaders/skyFragment.glsl";
+    material3.init();
+
+    // Create mesh
+    Mesh skybox;
+    skybox.geometry = geometry3;
+    skybox.material = material3;
+    skybox.init();
 
     // Misc loop vars
     UniformArgs uniformArgs;
@@ -523,6 +583,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
         sphere.draw(uniformArgs);
+        skybox.draw(uniformArgs);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
