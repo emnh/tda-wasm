@@ -2,10 +2,9 @@ window.UI = {};
 
 
 const THREE = require('three');
+window.UI.THREE = THREE;
 
-const mainGeometry = new THREE.PlaneBufferGeometry(10, 10, 256, 256);
-
-// console.log("mainGeometry", mainGeometry);
+// console.log("window.UI.geometry", window.UI.geometry);
 
 function getFloatArray(ar) {
   const fsz = 4;
@@ -30,25 +29,28 @@ function getIntArray(ar) {
 }
 
 window.UI.getPositionCount = function() {
-  const size = mainGeometry.attributes.position.count;
+  const size = window.UI.geometry.attributes.position.count;
   return size;
 }
 
 window.UI.getIndexCount = function() {
-  return mainGeometry.index.array.length / 3;
+  return window.UI.geometry.index.array.length / 3;
 };
 
 window.UI.getPosition = function() {
-  return getFloatArray(mainGeometry.attributes.position.array);
+  return getFloatArray(window.UI.geometry.attributes.position.array);
 };
 
 window.UI.getUV = function() {
-  return getFloatArray(mainGeometry.attributes.uv.array);
+  return getFloatArray(window.UI.geometry.attributes.uv.array);
 };
 
+window.UI.getNormal = function() {
+  return getFloatArray(window.UI.geometry.attributes.normal.array);
+};
 
 window.UI.getIndex = function() {
-  return getIntArray(mainGeometry.index.array);
+  return getIntArray(window.UI.geometry.index.array);
 };
 
 (function() {

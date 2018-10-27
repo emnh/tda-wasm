@@ -2,6 +2,7 @@
 
 precision mediump float;
 uniform float u_time;
+uniform vec3 u_light;
 uniform sampler2D u_tex;
 in vec2 v_uv;
 in vec3 v_nor;
@@ -62,8 +63,8 @@ void main() {
   //gl_FragColor = vec4(col, 1.0);
   //float dx = getHeight(v_pos.xy + vec2(delta, 0.0)) - getHeight(v_pos.xy);
   //float dy = getHeight(v_pos.xy + vec2(0.0, delta)) - getHeight(v_pos.xy);
-  vec3 light = normalize(vec3(1.0, 1.0, 1.0));
-  float diffuse = dot(light, v_nor) + 1.0;
+  vec3 light = normalize(u_light);
+  float diffuse = dot(light, v_nor) + 0.5;
   vec4 col1 = texture(u_tex, 10.0 * v_uv);
   //vec4 col2 = texture(u_tex, vec2(rand(v_uv), rand(-v_uv)));
   vec4 col2 = texture(u_tex, v_uv);

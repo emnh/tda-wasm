@@ -3,6 +3,7 @@
 precision mediump float;
 in vec4 position;
 in vec2 uv;
+in vec3 normal;
 out vec2 v_uv;
 out vec3 v_nor;
 uniform float u_time;
@@ -129,7 +130,8 @@ void main()
   vec2 c = pos.xz;
   float dx = getHeight(c + vec2(delta, 0.0)) - getHeight(c - vec2(delta, 0.0));
   float dy = getHeight(c + vec2(0.0, delta)) - getHeight(c - vec2(0.0, delta));
-  vec3 nor = normalize(vec3(dx, 2.0 * delta, dy));
+  vec3 nor = normalize(vec3(dx, 2.0 * delta, dy)) + 0.0 * normal;
+  v_nor = nor;
 
   //pos = rotate(pos, vec3(0.0, 1.0, 1.0), sin(theta));
   //v_nor = rotate(nor, vec3(0.0, 1.0, 1.0), sin(theta));

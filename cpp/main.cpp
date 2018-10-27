@@ -144,6 +144,11 @@ Geometry loadGeometry() {
     EM_ASM_INT({
           return UI.getUV();
         });
+  geometry.normal =
+    (GLfloat*)
+    EM_ASM_INT({
+          return UI.getNormal();
+        });
   /*
   for (int i = 0; i < geometry.count * 3; i++) {
     cerr << "pos: " << geometry.position[i] << endl;
@@ -204,6 +209,7 @@ public:
   double tick;
   double elapsed;
   Camera camera;
+  glm::vec3 light = glm::vec3(1.0, 1.0, 1.0);
 };
 
 class Material {
@@ -212,13 +218,18 @@ public:
 	const char* fragmentSourceFile;
   GLuint shaderProgram;
   GLint u_time;
+  GLint u_light;
   GLint u_mvp;
   GLint u_tex;
   GLuint textureID;
 
   void update(UniformArgs uniformArgs) {
+    uniformArgs.light.x = cos(uniformArgs.elapsed);
+    uniformArgs.light.z = sin(uniformArgs.elapsed);
+
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
+    glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
     glUniform1i(u_tex, textureID);
     glm::mat4 mvp = uniformArgs.camera.getMVP();
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
@@ -259,6 +270,7 @@ public:
 
     // Get uniform locations
     u_time = glGetUniformLocation(shaderProgram, "u_time");
+    u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
     
     // Initialize texture
@@ -357,12 +369,15 @@ public:
   GLuint vao;
   GLuint vbo;
   GLuint vboUV;
+  GLuint vboNormal;
   GLuint vindex;
 
   Mesh() {
   }
 
   void init() {
+    // Use program
+    glUseProgram(material.shaderProgram);
 
     // Create vertex array object
     glGenVertexArrays(1, &vao);
@@ -392,19 +407,33 @@ public:
     glEnableVertexAttribArray(uvAttrib);
     glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
     
+    // Create a Vertex Buffer Object and copy the vertex data to it
+    glGenBuffers(1, &vboNormal);
+    
+    // Upload UV data
+    glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
+    glBufferData(GL_ARRAY_BUFFER, geometry.count * 3 * sizeof(GLfloat), geometry.normal, GL_STATIC_DRAW);
+
+    // Specify the layout of the vertex normals 
+    GLint normalAttrib = glGetAttribLocation(material.shaderProgram, "normal");
+    glEnableVertexAttribArray(normalAttrib);
+    glVertexAttribPointer(normalAttrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    
     // Index
     glGenBuffers(1, &vindex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
     glBufferData(
         GL_ELEMENT_ARRAY_BUFFER, geometry.indexCount * 3 * sizeof(GLint), geometry.index, GL_STATIC_DRAW);
-    
-
-    // Bind main buffer again for drawing
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
   }
 
   void draw(UniformArgs uniformArgs) {
+    // Use program
+    glUseProgram(material.shaderProgram);
+    // Bind vertex array object
+    glBindVertexArray(vao);
+    // Bind main buffer again for drawing
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
     // Update material
     material.update(uniformArgs);
     // Draw
@@ -429,6 +458,10 @@ int main()
     emscripten_webgl_make_context_current(context);
 
     // Create geometry
+    EM_ASM({
+          const THREE = window.UI.THREE;
+          window.UI.geometry = new THREE.PlaneBufferGeometry(10, 10, 256, 256);
+        });
     Geometry geometry = loadGeometry();
     
     // Create material
@@ -445,8 +478,26 @@ int main()
     terrain.material = material;
     terrain.init();
 
-    //cerr << "positionCount: " << geometry.count << endl;
-    //cerr << "indexCount: " << geometry.indexCount << endl;
+    // Create another geometry
+    EM_ASM({
+          const THREE = window.UI.THREE;
+          window.UI.geometry = new THREE.SphereBufferGeometry(2, 32, 20);
+        });
+    Geometry geometry2 = loadGeometry();
+    
+    // Create material
+    Material material2;
+    const char* vertexSourceFile2 = "shaders/defaultVertex.glsl";
+    material2.vertexSourceFile = vertexSourceFile2;
+    const char* fragmentSourceFile2 = "shaders/defaultFragment.glsl";
+    material2.fragmentSourceFile = fragmentSourceFile2;
+    material2.init();
+
+    // Create mesh
+    Mesh sphere;
+    sphere.geometry = geometry2;
+    sphere.material = material2;
+    sphere.init();
 
     // Misc loop vars
     UniformArgs uniformArgs;
@@ -471,6 +522,7 @@ int main()
         glViewport(0, 0, state.width, state.height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
+        sphere.draw(uniformArgs);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
