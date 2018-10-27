@@ -5,7 +5,7 @@ const THREE = require('three');
 
 const mainGeometry = new THREE.PlaneBufferGeometry(10, 10, 256, 256);
 
-console.log("mainGeometry", mainGeometry);
+// console.log("mainGeometry", mainGeometry);
 
 function getFloatArray(ar) {
   const fsz = 4;

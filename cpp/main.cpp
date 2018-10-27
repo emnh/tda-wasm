@@ -99,55 +99,6 @@ void readFile(const char* fname, string& str) {
 							std::istreambuf_iterator<char>());
 }
 
-void checkShaderError(GLuint shader) {
-  GLint isCompiled = 0;
-  glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
-  if(isCompiled == GL_FALSE)
-  {
-    GLint maxLength = 0;
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
-
-    // The maxLength includes the NULL character
-    std::vector<GLchar> errorLog(maxLength);
-    glGetShaderInfoLog(shader, maxLength, &maxLength, &errorLog[0]);
-
-    for (unsigned int i = 0; i < errorLog.size(); i++) {
-      cerr << errorLog[i];
-    }
-    cerr << endl;
-
-    // Provide the infolog in whatever manor you deem best.
-    // Exit with failure.
-    glDeleteShader(shader); // Don't leak the shader.
-    return;
-  }
-}
-
-void checkLinkError(GLuint program) {
-  GLint isLinked = 0;
-  glGetProgramiv(program, GL_LINK_STATUS, &isLinked);
-  if (isLinked == GL_FALSE)
-  {
-    GLint maxLength = 0;
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
-
-    // The maxLength includes the NULL character
-    std::vector<GLchar> infoLog(maxLength);
-    glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
-
-    for (unsigned int i = 0; i < infoLog.size(); i++) {
-      cerr << infoLog[i];
-    }
-    cerr << endl;
-
-    // The program is useless now. So delete it.
-    glDeleteProgram(program);
-
-    // Provide the infolog in whatever manner you deem best.
-    // Exit with failure.
-    return;
-  }
-}
 
 class Geometry {
 public:
@@ -166,7 +117,6 @@ public:
     normal = NULL;
     index = NULL;
   }
-
 };
 
 Geometry loadGeometry() {
@@ -246,43 +196,45 @@ public:
   }
 };
 
-int main()
-{
-    EM_ASM(UI.allReady());
-    Geometry geometry = loadGeometry();
-    GLfloat* cubeData = geometry.position;
-    GLfloat* cubeUVs = geometry.uv;
-    GLint* index = geometry.index;
-    //cerr << "positionCount: " << geometry.count << endl;
-    //cerr << "indexCount: " << geometry.indexCount << endl;
+class UniformArgs {
+public:
+  double startTime;
+  double lastTime;
+  double now;
+  double tick;
+  double elapsed;
+  Camera camera;
+};
 
-    // Context configurations
-    EmscriptenWebGLContextAttributes attrs;
-    attrs.explicitSwapControl = 0;
-    attrs.depth = 1;
-    attrs.stencil = 1;
-    attrs.antialias = 1;
-    attrs.majorVersion = 2;
-    attrs.minorVersion = 0;
-    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
-    context = emscripten_webgl_create_context("canvas", &attrs);
-    emscripten_webgl_make_context_current(context);
+class Material {
+public:
+  const char* vertexSourceFile;
+	const char* fragmentSourceFile;
+  GLuint shaderProgram;
+  GLint u_time;
+  GLint u_mvp;
+  GLint u_tex;
+  GLuint textureID;
 
+  void update(UniformArgs uniformArgs) {
+    // Set uniforms
+    glUniform1f(u_time, uniformArgs.elapsed);
+    glUniform1i(u_tex, textureID);
+    glm::mat4 mvp = uniformArgs.camera.getMVP();
+    glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
-    /*
-    const GLfloat x = 0.5f;
-    const GLfloat y = 0.5f;
-    GLfloat vertices[] = {
-      0.0f, y, 0.0f, -y, -x, -y,
-      -x, y, -x, -y, 0.0f, y
-    };
-    */
+    // Activate texture
+    glActiveTexture(GL_TEXTURE0 + textureID);
+    glBindTexture(GL_TEXTURE_2D, textureID);
+  }
 
+  void init() {
+    // Read shader sources
 		std::string* vertexSourceStr = new string();
-		readFile("shaders/vertex.glsl", *vertexSourceStr);
+		readFile(vertexSourceFile, *vertexSourceStr);
 		const char* vertexSource = vertexSourceStr->c_str();
 		std::string* fragmentSourceStr = new string();
-		readFile("shaders/fragment.glsl", *fragmentSourceStr);
+		readFile(fragmentSourceFile, *fragmentSourceStr);
 		const char* fragmentSource = fragmentSourceStr->c_str();
 
     // Create and compile the vertex shader
@@ -298,73 +250,29 @@ int main()
     checkShaderError(fragmentShader);
 
     // Link the vertex and fragment shader into a shader program
-    GLuint shaderProgram = glCreateProgram();
+    shaderProgram = glCreateProgram();
     glAttachShader(shaderProgram, vertexShader);
     glAttachShader(shaderProgram, fragmentShader);
     glLinkProgram(shaderProgram);
     checkLinkError(shaderProgram);
     glUseProgram(shaderProgram);
 
-    GLint u_time = glGetUniformLocation(shaderProgram, "u_time");
-    GLint u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
-
-    // Create vertex array object
-    GLuint vao;
-    glGenVertexArrays(1, &vao);
-    glBindVertexArray(vao);
+    // Get uniform locations
+    u_time = glGetUniformLocation(shaderProgram, "u_time");
+    u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
     
-    // Create a Vertex Buffer Object and copy the vertex data to it
-    GLuint vbo;
-    glGenBuffers(1, &vbo);
-
-    // Upload position data
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBufferData(GL_ARRAY_BUFFER, geometry.count * 3 * sizeof(GLfloat), cubeData, GL_STATIC_DRAW);
-
-    // Specify the layout of the vertex position data
-    GLint posAttrib = glGetAttribLocation(shaderProgram, "position");
-    glEnableVertexAttribArray(posAttrib);
-    glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
-
-    // Create a Vertex Buffer Object and copy the vertex data to it
-    GLuint vboUV;
-    glGenBuffers(1, &vboUV);
-    
-    // Upload UV data
-    glBindBuffer(GL_ARRAY_BUFFER, vboUV);
-    glBufferData(GL_ARRAY_BUFFER, geometry.count * 2 * sizeof(GLfloat), cubeUVs, GL_STATIC_DRAW);
-
-    // Specify the layout of the vertex uvs 
-    GLint uvAttrib = glGetAttribLocation(shaderProgram, "uv");
-    glEnableVertexAttribArray(uvAttrib);
-    glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    
-    // Index
-    GLuint vindex;
-    glGenBuffers(1, &vindex);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER, geometry.indexCount * 3 * sizeof(GLint), geometry.index, GL_STATIC_DRAW);
-    
-
-    // Bind main buffer again for drawing
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
-
-    // Enable depth test
-    glEnable(GL_DEPTH_TEST);
-    // Accept fragment if it closer to the camera than the former one
-    glDepthFunc(GL_LESS);
-
+    // Initialize texture
+    initTexture();
+  }
+  
+  void initTexture() {
     // TEXTURE
-    
     int imgWidth;
     int imgHeight;
     char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
     //cerr << "imageData: " << (int) imageData << " " << imgWidth << " " << imgHeight << endl;
     
     // Create one OpenGL texture
-    GLuint textureID;
     glGenTextures(1, &textureID);
 
     // "Bind" the newly created texture : all future texture functions will modify this texture
@@ -386,36 +294,183 @@ int main()
     glGenerateMipmap(GL_TEXTURE_2D);
     
     // Get texture uniform
-    GLint u_tex = glGetUniformLocation(shaderProgram, "u_tex");
+    u_tex = glGetUniformLocation(shaderProgram, "u_tex");
+  }
+
+
+  void checkShaderError(GLuint shader) {
+    GLint isCompiled = 0;
+    glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
+    if(isCompiled == GL_FALSE)
+    {
+      GLint maxLength = 0;
+      glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &maxLength);
+
+      // The maxLength includes the NULL character
+      std::vector<GLchar> errorLog(maxLength);
+      glGetShaderInfoLog(shader, maxLength, &maxLength, &errorLog[0]);
+
+      for (unsigned int i = 0; i < errorLog.size(); i++) {
+        cerr << errorLog[i];
+      }
+      cerr << endl;
+
+      // Provide the infolog in whatever manor you deem best.
+      // Exit with failure.
+      glDeleteShader(shader); // Don't leak the shader.
+      return;
+    }
+  }
+
+  void checkLinkError(GLuint program) {
+    GLint isLinked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &isLinked);
+    if (isLinked == GL_FALSE)
+    {
+      GLint maxLength = 0;
+      glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+      // The maxLength includes the NULL character
+      std::vector<GLchar> infoLog(maxLength);
+      glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+
+      for (unsigned int i = 0; i < infoLog.size(); i++) {
+        cerr << infoLog[i];
+      }
+      cerr << endl;
+
+      // The program is useless now. So delete it.
+      glDeleteProgram(program);
+
+      // Provide the infolog in whatever manner you deem best.
+      // Exit with failure.
+      return;
+    }
+  }
+};
+
+class Mesh {
+public:
+  Material material;
+  Geometry geometry;
+
+  GLuint vao;
+  GLuint vbo;
+  GLuint vboUV;
+  GLuint vindex;
+
+  Mesh() {
+  }
+
+  void init() {
+
+    // Create vertex array object
+    glGenVertexArrays(1, &vao);
+    glBindVertexArray(vao);
+    
+    // Create a Vertex Buffer Object and copy the vertex data to it
+    glGenBuffers(1, &vbo);
+
+    // Upload position data
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, geometry.count * 3 * sizeof(GLfloat), geometry.position, GL_STATIC_DRAW);
+
+    // Specify the layout of the vertex position data
+    GLint posAttrib = glGetAttribLocation(material.shaderProgram, "position");
+    glEnableVertexAttribArray(posAttrib);
+    glVertexAttribPointer(posAttrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
+
+    // Create a Vertex Buffer Object and copy the vertex data to it
+    glGenBuffers(1, &vboUV);
+    
+    // Upload UV data
+    glBindBuffer(GL_ARRAY_BUFFER, vboUV);
+    glBufferData(GL_ARRAY_BUFFER, geometry.count * 2 * sizeof(GLfloat), geometry.uv, GL_STATIC_DRAW);
+
+    // Specify the layout of the vertex uvs 
+    GLint uvAttrib = glGetAttribLocation(material.shaderProgram, "uv");
+    glEnableVertexAttribArray(uvAttrib);
+    glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    
+    // Index
+    glGenBuffers(1, &vindex);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER, geometry.indexCount * 3 * sizeof(GLint), geometry.index, GL_STATIC_DRAW);
+    
+
+    // Bind main buffer again for drawing
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
+  }
+
+  void draw(UniformArgs uniformArgs) {
+    // Update material
+    material.update(uniformArgs);
+    // Draw
+    glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
+  }
+};
+
+int main()
+{
+    EM_ASM(UI.allReady());
+    
+    // Context configurations
+    EmscriptenWebGLContextAttributes attrs;
+    attrs.explicitSwapControl = 0;
+    attrs.depth = 1;
+    attrs.stencil = 1;
+    attrs.antialias = 1;
+    attrs.majorVersion = 2;
+    attrs.minorVersion = 0;
+    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
+    context = emscripten_webgl_create_context("canvas", &attrs);
+    emscripten_webgl_make_context_current(context);
+
+    // Create geometry
+    Geometry geometry = loadGeometry();
+    
+    // Create material
+    Material material;
+    const char* vertexSourceFile = "shaders/vertex.glsl";
+    material.vertexSourceFile = vertexSourceFile;
+    const char* fragmentSourceFile = "shaders/fragment.glsl";
+    material.fragmentSourceFile = fragmentSourceFile;
+    material.init();
+
+    // Create mesh
+    Mesh terrain;
+    terrain.geometry = geometry;
+    terrain.material = material;
+    terrain.init();
+
+    //cerr << "positionCount: " << geometry.count << endl;
+    //cerr << "indexCount: " << geometry.indexCount << endl;
 
     // Misc loop vars
-    double startTime = emscripten_get_now();
-    double lastTime = startTime;
-    Camera camera;
+    UniformArgs uniformArgs;
+    uniformArgs.startTime = emscripten_get_now();
+    uniformArgs.lastTime = uniformArgs.startTime;
+    
+    // Enable depth test
+    glEnable(GL_DEPTH_TEST);
+    // Accept fragment if it closer to the camera than the former one
+    glDepthFunc(GL_LESS);
+    // Set clear color
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     loop = [&]
     {
-        double now = emscripten_get_now();
-        double tick = (now - lastTime) / 1000.0;
-        lastTime = now;
-        double elapsed = (now - startTime) / 1000.0;
-
-        camera.update(tick);
+        uniformArgs.now = emscripten_get_now();
+        uniformArgs.tick = (uniformArgs.now - uniformArgs.lastTime) / 1000.0;
+        uniformArgs.lastTime = uniformArgs.now;
+        uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
+        uniformArgs.camera.update(uniformArgs.tick);
 
         glViewport(0, 0, state.width, state.height);
-
-        glUniform1f(u_time, elapsed);
-        glUniform1i(u_tex, textureID);
-        glActiveTexture(GL_TEXTURE0 + textureID);
-        glBindTexture(GL_TEXTURE_2D, textureID);
-
-        glm::mat4 mvp = camera.getMVP();
-        glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
-
-        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-        glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
+        terrain.draw(uniformArgs);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
