@@ -14,5 +14,6 @@ void main()
   v_uv = uv;
 	v_nor = normal;
   vec3 pos = position.xyz;
+	pos.y += 10.0;
   gl_Position = u_mvp * vec4(pos, 1.0);
 }

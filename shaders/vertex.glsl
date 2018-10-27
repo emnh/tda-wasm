@@ -115,7 +115,19 @@ vec3 rotate(vec3 v, vec3 axis, float angle) {
 }
 
 float getHeight(vec2 pos) {
-  return 0.1 * snoise(2.0 * pos.xy);
+  float value =
+    snoise(pos * 1.63)
+    * 0.1
+    + snoise(pos * 10.0)
+    * 0.002
+    + snoise(pos * 20.0)
+    * 0.0005
+    + snoise(pos * 40.0)
+    * 0.00025
+    + snoise(pos * 20.0)
+    * 0.01;
+  return value * 100.0;
+  //return 0.1 * snoise(2.0 * pos.xy);
 }
 
 void main()
@@ -123,14 +135,14 @@ void main()
   v_uv = uv;
   vec3 pos = position.xyz;
   float theta = u_time;
-  pos.z = getHeight(pos.xy);
+  vec2 c = uv;
+  pos.z = getHeight(c);
   pos.xyz = pos.xzy;
 
   float delta = 0.001;
-  vec2 c = pos.xz;
   float dx = getHeight(c + vec2(delta, 0.0)) - getHeight(c - vec2(delta, 0.0));
   float dy = getHeight(c + vec2(0.0, delta)) - getHeight(c - vec2(0.0, delta));
-  vec3 nor = normalize(vec3(dx, 2.0 * delta, dy)) + 0.0 * normal;
+  vec3 nor = normalize(vec3(dx, 50.0 * delta, dy)) + 0.0 * normal;
   v_nor = nor;
 
   //pos = rotate(pos, vec3(0.0, 1.0, 1.0), sin(theta));

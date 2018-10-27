@@ -30,7 +30,7 @@ public:
   bool movingLeft = false;
   bool movingRight = false;
   float fov = 45.0;
-  double pitch = 0.0;
+  double pitch = -89.0;
   double yaw = 0.0;;
 };
 
@@ -162,7 +162,7 @@ Geometry loadGeometry() {
 
 class Camera {
 public:
-  glm::vec3 cameraPos   = glm::vec3(0.0f, 1.0f,  0.0f);
+  glm::vec3 cameraPos   = glm::vec3(0.0f, 20.0f,  0.0f);
   glm::vec3 cameraFront = glm::vec3(0.0f, -1.0f,  0.0f);
   glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
@@ -209,7 +209,7 @@ public:
   double tick;
   double elapsed;
   Camera camera;
-  glm::vec3 light = glm::vec3(1.0, 1.0, 1.0);
+  glm::vec3 light = glm::vec3(1.0, 1000.0, 1.0);
 };
 
 class Material {
@@ -224,8 +224,8 @@ public:
   GLuint textureID;
 
   void update(UniformArgs uniformArgs) {
-    uniformArgs.light.x = cos(uniformArgs.elapsed);
-    uniformArgs.light.z = sin(uniformArgs.elapsed);
+    // uniformArgs.light.x = cos(uniformArgs.elapsed);
+    // uniformArgs.light.z = sin(uniformArgs.elapsed);
 
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
@@ -460,7 +460,7 @@ int main()
     // Create geometry
     EM_ASM({
           const THREE = window.UI.THREE;
-          window.UI.geometry = new THREE.PlaneBufferGeometry(10, 10, 256, 256);
+          window.UI.geometry = new THREE.PlaneBufferGeometry(100, 100, 256, 256);
         });
     Geometry geometry = loadGeometry();
     
