@@ -76,8 +76,10 @@ let canv = document.getElementById('canvas');
 
 // handle event
 const resize = function() {
-    const width = Math.min(window.innerWidth, window.innerHeight);
-    const height = width;
+    //const width = Math.min(window.innerWidth, window.innerHeight);
+    //const height = width;
+    const width = window.innerWidth;
+    const height = window.innerHeight;
     canv.width = width;
     canv.height = height;
     //console.log("resize: ", width, height);

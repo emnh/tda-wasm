@@ -204,6 +204,8 @@ public:
 
 class UniformArgs {
 public:
+  int width;
+  int height;
   double startTime;
   double lastTime;
   double now;
@@ -219,6 +221,7 @@ public:
 	const char* fragmentSourceFile;
   GLuint shaderProgram;
   GLint u_time;
+  GLint u_resolution;
   GLint u_light;
   GLint u_mvp;
   GLint u_tex;
@@ -231,6 +234,7 @@ public:
 
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
+    glUniform2f(u_resolution, uniformArgs.width, uniformArgs.height);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
     glUniform1i(u_tex, activeTextureID);
     glm::mat4 mvp = uniformArgs.camera.getMVP();
@@ -273,6 +277,7 @@ public:
 
     // Get uniform locations
     u_time = glGetUniformLocation(shaderProgram, "u_time");
+    u_resolution = glGetUniformLocation(shaderProgram, "u_resolution");
     u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
     // Get texture uniform
@@ -302,8 +307,6 @@ public:
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
 
     // Texture parameters
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 
     // When MAGnifying the image (no bigger mipmap available), use LINEAR filtering
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
@@ -366,6 +369,7 @@ public:
 };
 
 class CubeMaterial : public Material {
+  
   virtual void initTexture() {
     const char* images[] = {
       "images/Box_Right.jpg",
@@ -383,7 +387,7 @@ class CubeMaterial : public Material {
     glGenTextures(1, &textureID);
     activeTextureID = state.numTextures;
     glActiveTexture(GL_TEXTURE0 + activeTextureID);
-    cerr << "cube active: " << activeTextureID << endl;
+    //cerr << "cube active: " << activeTextureID << endl;
     state.numTextures++;
     glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
     for (int j = 0; j < 6; j++) {
@@ -400,6 +404,12 @@ class CubeMaterial : public Material {
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+  }
+};
+
+// TODO: other way around
+class CopyMaterial : public Material {
+  virtual void initTexture() {
   }
 };
 
@@ -482,6 +492,72 @@ public:
     // Draw
     glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
   }
+
+  Mesh(const char* vertexSourceFile, const char* fragmentSourceFile, Material& material) {
+    geometry = loadGeometry();
+    
+    // Create material
+    material.vertexSourceFile = vertexSourceFile;
+    material.fragmentSourceFile = fragmentSourceFile;
+    material.init();
+    this->material = material;
+
+    init();
+  }
+};
+
+class RenderTarget {
+public:
+  int imgWidth;
+  int imgHeight;
+  int activeTextureID;
+  GLuint textureID;
+  GLuint framebuffer;
+
+  RenderTarget(int width, int height) {
+    imgWidth = width;
+    imgHeight = height;
+  }
+
+  void init() {
+    // Get extension
+    emscripten_webgl_enable_extension(emscripten_webgl_get_current_context(), "EXT_color_buffer_float");
+    emscripten_webgl_enable_extension(emscripten_webgl_get_current_context(), "OES_texture_float_linear");
+
+    // Create and bind texture
+    glGenTextures(1, &textureID);
+    activeTextureID = state.numTextures;
+    glActiveTexture(GL_TEXTURE0 + activeTextureID);
+    state.numTextures++;
+    glBindTexture(GL_TEXTURE_2D, textureID);
+
+    // Initialize empty texture
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, imgWidth, imgHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    // Texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    // Create and bind framebuffer
+    glGenFramebuffers(1, &framebuffer);
+    activate();
+
+    // Attach texture
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
+
+    // Reset
+    deactivate();
+  }
+
+  void activate() {
+    glBindFramebuffer(GL_FRAMEBUFFER, framebuffer);
+  }
+
+  void deactivate() {
+    glBindFramebuffer(GL_FRAMEBUFFER, NULL);
+  }
 };
 
 int main()
@@ -506,38 +582,15 @@ int main()
           var sz = 100.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
         });
-    Geometry geometry = loadGeometry();
-    
-    // Create material
     Material material;
-    material.vertexSourceFile = "shaders/vertex.glsl";
-    material.fragmentSourceFile = "shaders/fragment.glsl";
-    material.init();
-
-    // Create mesh
-    Mesh terrain;
-    terrain.geometry = geometry;
-    terrain.material = material;
-    terrain.init();
+    Mesh terrain("shaders/vertex.glsl", "shaders/fragment.glsl", material);
 
     // Create another geometry
     EM_ASM({
           const THREE = window.UI.THREE;
           window.UI.geometry = new THREE.SphereBufferGeometry(2, 32, 20);
         });
-    Geometry geometry2 = loadGeometry();
-    
-    // Create material
-    Material material2;
-    material2.vertexSourceFile = "shaders/defaultVertex.glsl";
-    material2.fragmentSourceFile = "shaders/defaultFragment.glsl";
-    material2.init();
-
-    // Create mesh
-    Mesh sphere;
-    sphere.geometry = geometry2;
-    sphere.material = material2;
-    sphere.init();
+    Mesh sphere("shaders/defaultVertex.glsl", "shaders/defaultFragment.glsl", material);
 
     // Create another geometry
     EM_ASM({
@@ -545,19 +598,24 @@ int main()
           var sz = 100000.0;
           window.UI.geometry = new THREE.BoxBufferGeometry(sz, sz, sz, 1, 1, 1);
         });
-    Geometry geometry3 = loadGeometry();
+    CubeMaterial cubeMaterial;
+    Mesh skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl", cubeMaterial);
     
-    // Create material
-    CubeMaterial material3;
-    material3.vertexSourceFile = "shaders/skyVertex.glsl";
-    material3.fragmentSourceFile = "shaders/skyFragment.glsl";
-    material3.init();
+    // Create render target
+    int sz = 256;
+    RenderTarget heightMap(sz, sz);
+    heightMap.init();
 
-    // Create mesh
-    Mesh skybox;
-    skybox.geometry = geometry3;
-    skybox.material = material3;
-    skybox.init();
+    // Create geometry
+    EM_ASM({
+          const THREE = window.UI.THREE;
+          var sz = 2.0;
+          window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 1, 1);
+        });
+    CopyMaterial copyMaterial;
+    Mesh fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl", copyMaterial);
+    fullscreenQuad.material.textureID = heightMap.textureID;
+    fullscreenQuad.material.activeTextureID = heightMap.activeTextureID;
 
     // Misc loop vars
     UniformArgs uniformArgs;
@@ -573,17 +631,27 @@ int main()
 
     loop = [&]
     {
+        uniformArgs.width = heightMap.imgWidth;
+        uniformArgs.height = heightMap.imgHeight;
         uniformArgs.now = emscripten_get_now();
         uniformArgs.tick = (uniformArgs.now - uniformArgs.lastTime) / 1000.0;
         uniformArgs.lastTime = uniformArgs.now;
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
 
-        glViewport(0, 0, state.width, state.height);
+        heightMap.activate();
+        glViewport(0, 0, uniformArgs.width, uniformArgs.height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        heightMap.deactivate();
+
+        uniformArgs.width = state.width;
+        uniformArgs.height = state.height;
+        glViewport(0, 0, uniformArgs.width, uniformArgs.height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
         sphere.draw(uniformArgs);
         skybox.draw(uniformArgs);
+        //fullscreenQuad.draw(uniformArgs);
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
