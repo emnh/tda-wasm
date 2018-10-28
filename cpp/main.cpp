@@ -21,6 +21,8 @@
 
 using namespace std;
 
+const int maxTexturesPerMaterial = 5;
+
 class State {
 public:
   float width = 1.0;
@@ -215,6 +217,13 @@ public:
   glm::vec3 light = glm::vec3(1.0, 1000.0, 1.0);
 };
 
+class TextureInfo {
+public:
+  GLuint id;
+  GLuint activeID;
+  GLint u_texture;
+};
+
 class Material {
 public:
   const char* vertexSourceFile;
@@ -225,8 +234,8 @@ public:
   GLint u_light;
   GLint u_mvp;
   GLint u_tex;
-  GLuint textureID;
-  GLuint activeTextureID;
+  int textureCount = 0;
+  TextureInfo textures[maxTexturesPerMaterial];
 
   void update(UniformArgs uniformArgs) {
     // uniformArgs.light.x = cos(uniformArgs.elapsed);
@@ -236,7 +245,9 @@ public:
     glUniform1f(u_time, uniformArgs.elapsed);
     glUniform2f(u_resolution, uniformArgs.width, uniformArgs.height);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
-    glUniform1i(u_tex, activeTextureID);
+    for (int i = 0; i < textureCount; i++) {
+      glUniform1i(textures[i].u_texture, textures[i].activeID);
+    }
     glm::mat4 mvp = uniformArgs.camera.getMVP();
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
 
@@ -280,43 +291,46 @@ public:
     u_resolution = glGetUniformLocation(shaderProgram, "u_resolution");
     u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
-    // Get texture uniform
-    u_tex = glGetUniformLocation(shaderProgram, "u_tex");
     
     // Initialize texture
     initTexture();
   }
-  
-  virtual void initTexture() {
-    int imgWidth;
-    int imgHeight;
-    char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
-    //cerr << "imageData: " << (int) imageData << " " << imgWidth << " " << imgHeight << endl;
-    
-    // Create one OpenGL texture
-    glGenTextures(1, &textureID);
 
-    // "Bind" the newly created texture : all future texture functions will modify this texture
-    activeTextureID = state.numTextures;
-    glActiveTexture(GL_TEXTURE0 + activeTextureID);
-    state.numTextures++;
-    glBindTexture(GL_TEXTURE_2D, textureID);
-    //cerr << "textureID: " << textureID << endl;
+  int setTexture(const char* uniform, GLint id, int activeID) {
+    int index = textureCount;
+    textureCount++;
+    TextureInfo& ti = textures[index];
+    ti.id = id;
+    ti.activeID = activeID;
 
-    // Give the image to OpenGL
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
-
-    // Texture parameters
-
-    // When MAGnifying the image (no bigger mipmap available), use LINEAR filtering
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // When MINifying the image, use a LINEAR blend of two mipmaps, each filtered LINEARLY too
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    // Generate mipmaps, by the way.
-    glGenerateMipmap(GL_TEXTURE_2D);
+    // Get texture uniform
+    glUseProgram(shaderProgram);
+    ti.u_texture = glGetUniformLocation(shaderProgram, uniform);
+    return index;
   }
 
+  int addTexture(const char* uniform, GLint type) {
+    int index = textureCount;
+    textureCount++;
+    TextureInfo& ti = textures[index];
 
+    // Get texture uniform
+    ti.u_texture = glGetUniformLocation(shaderProgram, uniform);
+
+    // Create one OpenGL texture
+    glGenTextures(1, &ti.id);
+
+    // "Bind" the newly created texture : all future texture functions will modify this texture
+    ti.activeID = state.numTextures;
+    glActiveTexture(GL_TEXTURE0 + ti.activeID);
+    state.numTextures++;
+    glBindTexture(type, ti.id);
+    return index;
+  }
+
+  virtual void initTexture() {
+  }
+  
   void checkShaderError(GLuint shader) {
     GLint isCompiled = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
@@ -368,6 +382,19 @@ public:
   }
 };
 
+class TerrainMaterial : public Material {
+  virtual void initTexture() {
+    int imgWidth;
+    int imgHeight;
+    char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
+    addTexture("u_tex", GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+  }
+};
+
 class CubeMaterial : public Material {
   
   virtual void initTexture() {
@@ -384,21 +411,14 @@ class CubeMaterial : public Material {
        GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 
        GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 
     };
-    glGenTextures(1, &textureID);
-    activeTextureID = state.numTextures;
-    glActiveTexture(GL_TEXTURE0 + activeTextureID);
-    //cerr << "cube active: " << activeTextureID << endl;
-    state.numTextures++;
-    glBindTexture(GL_TEXTURE_CUBE_MAP, textureID);
+    addTexture("u_tex", GL_TEXTURE_CUBE_MAP);
     for (int j = 0; j < 6; j++) {
         int imgWidth;
         int imgHeight;
         char* imageData = emscripten_get_preloaded_image_data(images[j], &imgWidth, &imgHeight);
-        // cerr << "imgsize: " << imgWidth << " " << imgHeight << endl;
         glTexImage2D(targets[j], 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
     }
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    //glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
@@ -576,23 +596,24 @@ int main()
     context = emscripten_webgl_create_context("canvas", &attrs);
     emscripten_webgl_make_context_current(context);
 
-    // Create geometry
+    // Create terrain
     EM_ASM({
           const THREE = window.UI.THREE;
           var sz = 100.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
         });
-    Material material;
-    Mesh terrain("shaders/vertex.glsl", "shaders/fragment.glsl", material);
+    TerrainMaterial terrainMaterial;
+    Mesh terrain("shaders/vertex.glsl", "shaders/fragment.glsl", terrainMaterial);
 
-    // Create another geometry
+    // Create sphere
     EM_ASM({
           const THREE = window.UI.THREE;
           window.UI.geometry = new THREE.SphereBufferGeometry(2, 32, 20);
         });
+    Material material;
     Mesh sphere("shaders/defaultVertex.glsl", "shaders/defaultFragment.glsl", material);
 
-    // Create another geometry
+    // Create skybox
     EM_ASM({
           const THREE = window.UI.THREE;
           var sz = 100000.0;
@@ -606,16 +627,23 @@ int main()
     RenderTarget heightMap(sz, sz);
     heightMap.init();
 
-    // Create geometry
+    // Create height map mesh
     EM_ASM({
           const THREE = window.UI.THREE;
           var sz = 2.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 1, 1);
         });
-    CopyMaterial copyMaterial;
+    Material heightMapMaterial;
+    Mesh heightMapMesh("shaders/heightmapVertex.glsl", "shaders/heightmapFragment.glsl", heightMapMaterial);
+
+    // Create copy mesh
+    // Uses height map geometry
+    Material copyMaterial;
     Mesh fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl", copyMaterial);
-    fullscreenQuad.material.textureID = heightMap.textureID;
-    fullscreenQuad.material.activeTextureID = heightMap.activeTextureID;
+    fullscreenQuad.material.setTexture("u_tex", heightMap.textureID, heightMap.activeTextureID);
+
+    // Set terrain height map
+    terrain.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
 
     // Misc loop vars
     UniformArgs uniformArgs;
@@ -629,6 +657,8 @@ int main()
     // Set clear color
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
+    bool first = true;
+
     loop = [&]
     {
         uniformArgs.width = heightMap.imgWidth;
@@ -639,10 +669,13 @@ int main()
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
 
-        heightMap.activate();
-        glViewport(0, 0, uniformArgs.width, uniformArgs.height);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        heightMap.deactivate();
+        if (first) {
+          heightMap.activate();
+          glViewport(0, 0, uniformArgs.width, uniformArgs.height);
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          heightMapMesh.draw(uniformArgs);
+          heightMap.deactivate();
+        }
 
         uniformArgs.width = state.width;
         uniformArgs.height = state.height;
@@ -652,6 +685,8 @@ int main()
         sphere.draw(uniformArgs);
         skybox.draw(uniformArgs);
         //fullscreenQuad.draw(uniformArgs);
+        
+        first = false;
     };
 
     emscripten_set_main_loop(main_loop, 0, true);

@@ -8,12 +8,12 @@ out vec2 v_uv;
 out vec3 v_nor;
 uniform float u_time;
 uniform mat4 u_mvp;
+uniform vec2 u_resolution;
 
 void main()
 {
   v_uv = uv;
-	v_nor = normal;
-  vec3 pos = position.xyz;
-	pos.y += 15.0;
-  gl_Position = u_mvp * vec4(pos, 1.0);
+  v_nor = normal;
+  vec2 pos = position.xy;
+  gl_Position = vec4(pos, 0.0, 1.0);
 }
