@@ -125,7 +125,7 @@ void main() {
   vec2 delta = 1.0 / u_resolution;
   float dx = getHeight(c + vec2(delta.x, 0.0)) - getHeight(c - vec2(delta.x, 0.0));
   float dy = getHeight(c + vec2(0.0, delta.y)) - getHeight(c - vec2(0.0, delta.y));
-  vec3 nor = normalize(vec3(dx, length(delta), dy));
+  vec3 nor = normalize(vec3(2.0 * dx, -4.0 * delta.x, 2.0 * dy));
 
   gl_FragColor = vec4(height, nor);
 }

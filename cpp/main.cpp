@@ -21,7 +21,8 @@
 
 using namespace std;
 
-const int maxTexturesPerMaterial = 5;
+const int maxTexturesPerMaterial = 10;
+const int maxUniformsPerMaterial = 20;
 
 class State {
 public:
@@ -165,7 +166,8 @@ Geometry loadGeometry() {
 
 class Camera {
 public:
-  glm::vec3 cameraPos   = glm::vec3(0.0f, 10.0f,  0.0f);
+  // 10.0
+  glm::vec3 cameraPos   = glm::vec3(0.0f, 30.0f,  0.0f);
   glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f,  0.0f);
   glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
@@ -214,7 +216,8 @@ public:
   double tick;
   double elapsed;
   Camera camera;
-  glm::vec3 light = glm::vec3(1.0, 1000.0, 1.0);
+  glm::vec3 light = glm::vec3(0.0, -1000.0, 0.0);
+  glm::vec2 axis;
 };
 
 class TextureInfo {
@@ -222,6 +225,12 @@ public:
   GLuint id;
   GLuint activeID;
   GLint u_texture;
+};
+
+class UniformInfo {
+public:
+  GLint index;
+  std::function<void(GLint, UniformArgs&)> updater;
 };
 
 class Material {
@@ -233,11 +242,12 @@ public:
   GLint u_resolution;
   GLint u_light;
   GLint u_mvp;
-  GLint u_tex;
+  int uniformCount = 0;
+  UniformInfo uniforms[maxUniformsPerMaterial];
   int textureCount = 0;
   TextureInfo textures[maxTexturesPerMaterial];
 
-  void update(UniformArgs uniformArgs) {
+  virtual void update(UniformArgs& uniformArgs) {
     // uniformArgs.light.x = cos(uniformArgs.elapsed);
     // uniformArgs.light.z = sin(uniformArgs.elapsed);
 
@@ -245,6 +255,9 @@ public:
     glUniform1f(u_time, uniformArgs.elapsed);
     glUniform2f(u_resolution, uniformArgs.width, uniformArgs.height);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
+    for (int i = 0; i < uniformCount; i++) {
+      uniforms[i].updater(uniforms[i].index, uniformArgs);
+    }
     for (int i = 0; i < textureCount; i++) {
       glUniform1i(textures[i].u_texture, textures[i].activeID);
     }
@@ -294,6 +307,10 @@ public:
     
     // Initialize texture
     initTexture();
+    initRest();
+  }
+
+  virtual void initRest() {
   }
 
   int setTexture(const char* uniform, GLint id, int activeID) {
@@ -306,6 +323,14 @@ public:
     // Get texture uniform
     glUseProgram(shaderProgram);
     ti.u_texture = glGetUniformLocation(shaderProgram, uniform);
+    return index;
+  }
+
+  int addUniform(const char* uniform, const std::function<void(GLint, UniformArgs&)>& updater) {
+    int index = uniformCount;
+    uniformCount++;
+    uniforms[index].index = glGetUniformLocation(shaderProgram, uniform);
+    uniforms[index].updater = updater;
     return index;
   }
 
@@ -382,12 +407,28 @@ public:
   }
 };
 
+class WaterMaterial : public Material {
+  virtual void initRest() {
+    addUniform("u_axis", [](GLint index, UniformArgs& uniformArgs) {
+        glUniform2fv(index, 1, glm::value_ptr(uniformArgs.axis));
+    });
+  }
+};
+
 class TerrainMaterial : public Material {
   virtual void initTexture() {
+    // TODO: addImage function
     int imgWidth;
     int imgHeight;
     char* imageData = emscripten_get_preloaded_image_data("images/grass.jpg", &imgWidth, &imgHeight);
     addTexture("u_tex", GL_TEXTURE_2D);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+
+    imageData = emscripten_get_preloaded_image_data("images/water.jpg", &imgWidth, &imgHeight);
+    addTexture("u_waterTex", GL_TEXTURE_2D);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -499,7 +540,7 @@ public:
         GL_ELEMENT_ARRAY_BUFFER, geometry.indexCount * 3 * sizeof(GLint), geometry.index, GL_STATIC_DRAW);
   }
 
-  void draw(UniformArgs uniformArgs) {
+  void draw(UniformArgs& uniformArgs) {
     // Use program
     glUseProgram(material.shaderProgram);
     // Bind vertex array object
@@ -622,7 +663,7 @@ int main()
     CubeMaterial cubeMaterial;
     Mesh skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl", cubeMaterial);
     
-    // Create render target
+    // Create height map render target
     int sz = 256;
     RenderTarget heightMap(sz, sz);
     heightMap.init();
@@ -635,20 +676,40 @@ int main()
         });
     Material heightMapMaterial;
     Mesh heightMapMesh("shaders/heightmapVertex.glsl", "shaders/heightmapFragment.glsl", heightMapMaterial);
+    
+    // Create water map render targets
+    RenderTarget waterMap1(sz, sz);
+    waterMap1.init();
+    RenderTarget waterMap2(sz, sz);
+    waterMap2.init();
+
+    // Create water map mesh
+    // Uses same geometry
+    WaterMaterial waterMapMaterial;
+    Mesh waterMapMesh("shaders/watermapVertex.glsl", "shaders/watermapFragment.glsl", waterMapMaterial);
+    waterMapMesh.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
+    int waterIndex =
+      waterMapMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
+    TextureInfo& waterTextureInfo = waterMapMesh.material.textures[waterIndex];
 
     // Create copy mesh
-    // Uses height map geometry
+    // Uses same geometry
     Material copyMaterial;
     Mesh fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl", copyMaterial);
-    fullscreenQuad.material.setTexture("u_tex", heightMap.textureID, heightMap.activeTextureID);
+    //fullscreenQuad.material.setTexture("u_tex", heightMap.textureID, heightMap.activeTextureID);
+    fullscreenQuad.material.setTexture("u_tex", waterMap1.textureID, waterMap1.activeTextureID);
 
     // Set terrain height map
     terrain.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
+    int terrainWaterIndex =
+      terrain.material.setTexture("u_watermap", waterMap1.textureID, waterMap1.activeTextureID);
+    TextureInfo& terrainWaterTextureInfo = terrain.material.textures[terrainWaterIndex];
 
     // Misc loop vars
     UniformArgs uniformArgs;
     uniformArgs.startTime = emscripten_get_now();
     uniformArgs.lastTime = uniformArgs.startTime;
+    int currentWaterRT = 0;
     
     // Enable depth test
     glEnable(GL_DEPTH_TEST);
@@ -661,28 +722,52 @@ int main()
 
     loop = [&]
     {
-        uniformArgs.width = heightMap.imgWidth;
-        uniformArgs.height = heightMap.imgHeight;
         uniformArgs.now = emscripten_get_now();
         uniformArgs.tick = (uniformArgs.now - uniformArgs.lastTime) / 1000.0;
         uniformArgs.lastTime = uniformArgs.now;
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
 
+        // Height map
         if (first) {
+          uniformArgs.width = heightMap.imgWidth;
+          uniformArgs.height = heightMap.imgHeight;
           heightMap.activate();
           glViewport(0, 0, uniformArgs.width, uniformArgs.height);
-          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          glClear(GL_COLOR_BUFFER_BIT);
           heightMapMesh.draw(uniformArgs);
           heightMap.deactivate();
         }
 
+        // Water
+        for (int axisIndex = 0; axisIndex < 2; axisIndex++) {
+          currentWaterRT = (currentWaterRT + 1) % 2;
+          RenderTarget& waterMapSource = currentWaterRT == 0 ? waterMap1 : waterMap2;
+          RenderTarget& waterMapTarget = currentWaterRT == 0 ? waterMap2 : waterMap1;
+          uniformArgs.axis =
+            axisIndex % 2 == 0 ?
+            glm::vec2(1.0 / static_cast<double>(waterMapSource.imgWidth), 0.0) :
+            glm::vec2(0.0, 1.0 / static_cast<double>(waterMapSource.imgHeight));
+          waterTextureInfo.id = waterMapSource.textureID;
+          waterTextureInfo.activeID = waterMapSource.activeTextureID;
+          uniformArgs.width = waterMapSource.imgWidth;
+          uniformArgs.height = waterMapSource.imgHeight;
+          waterMapTarget.activate();
+          glViewport(0, 0, uniformArgs.width, uniformArgs.height);
+          glClear(GL_COLOR_BUFFER_BIT);
+          waterMapMesh.draw(uniformArgs);
+          waterMapTarget.deactivate();
+          terrainWaterTextureInfo.id = waterMapTarget.textureID;
+          terrainWaterTextureInfo.activeID = waterMapTarget.activeTextureID;
+        }
+
+        // Render
         uniformArgs.width = state.width;
         uniformArgs.height = state.height;
         glViewport(0, 0, uniformArgs.width, uniformArgs.height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
-        sphere.draw(uniformArgs);
+        //sphere.draw(uniformArgs);
         skybox.draw(uniformArgs);
         //fullscreenQuad.draw(uniformArgs);
         
