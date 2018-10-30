@@ -33,8 +33,9 @@ public:
   bool movingLeft = false;
   bool movingRight = false;
   float fov = 45.0;
-  double pitch = -89.0;
-  double yaw = 0.0;;
+  // pitch, yaw: -23.3653 -53.9898
+  double pitch = -23.3653;
+  double yaw = -53.9898;
   int numTextures = 0;
 };
 
@@ -167,7 +168,8 @@ Geometry loadGeometry() {
 class Camera {
 public:
   // 10.0
-  glm::vec3 cameraPos   = glm::vec3(0.0f, 30.0f,  0.0f);
+  // cameraPos: -25.7092 23.5091 26.9642
+  glm::vec3 cameraPos   = glm::vec3(-21.5f, 22.8f,  27.5f);
   glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f,  0.0f);
   glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
@@ -195,7 +197,9 @@ public:
         cameraPos -= cameraSpeed * cameraFront;
     }
     if (state.movingUp) {
-        cameraPos += cameraSpeed * cameraFront;
+      cerr << "cameraPos: " << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << endl;
+      cerr << "pitch, yaw: " << state.pitch << " " << state.yaw << endl;
+      cameraPos += cameraSpeed * cameraFront;
     }
     if (state.movingLeft) {
         cameraPos -= glm::normalize(glm::cross(cameraFront, cameraUp)) * cameraSpeed;
@@ -241,6 +245,7 @@ public:
   GLint u_time;
   GLint u_resolution;
   GLint u_light;
+  GLint u_eye;
   GLint u_mvp;
   int uniformCount = 0;
   UniformInfo uniforms[maxUniformsPerMaterial];
@@ -255,6 +260,7 @@ public:
     glUniform1f(u_time, uniformArgs.elapsed);
     glUniform2f(u_resolution, uniformArgs.width, uniformArgs.height);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
+    glUniform3fv(u_eye, 1, glm::value_ptr(uniformArgs.camera.cameraPos));
     for (int i = 0; i < uniformCount; i++) {
       uniforms[i].updater(uniforms[i].index, uniformArgs);
     }
@@ -303,6 +309,7 @@ public:
     u_time = glGetUniformLocation(shaderProgram, "u_time");
     u_resolution = glGetUniformLocation(shaderProgram, "u_resolution");
     u_light = glGetUniformLocation(shaderProgram, "u_light");
+    u_eye = glGetUniformLocation(shaderProgram, "u_eye");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
     
     // Initialize texture
@@ -691,6 +698,15 @@ int main()
     int waterIndex =
       waterMapMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
     TextureInfo& waterTextureInfo = waterMapMesh.material.textures[waterIndex];
+    
+    // Create water wave mesh
+    // Uses same geometry
+    WaterMaterial waterWavesMaterial;
+    Mesh waterWavesMesh("shaders/watermapVertex.glsl", "shaders/waterwavesFragment.glsl", waterWavesMaterial);
+    waterWavesMesh.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
+    int waterIndex2 =
+      waterWavesMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
+    TextureInfo& waterTextureInfo2 = waterWavesMesh.material.textures[waterIndex2];
 
     // Create copy mesh
     // Uses same geometry
@@ -757,11 +773,34 @@ int main()
           glClear(GL_COLOR_BUFFER_BIT);
           waterMapMesh.draw(uniformArgs);
           waterMapTarget.deactivate();
+        }
+
+        // Water waves
+        for (int axisIndex = 0; axisIndex < 1; axisIndex++) {
+          currentWaterRT = (currentWaterRT + 1) % 2;
+          RenderTarget& waterMapSource = currentWaterRT == 0 ? waterMap1 : waterMap2;
+          RenderTarget& waterMapTarget = currentWaterRT == 0 ? waterMap2 : waterMap1;
+          uniformArgs.axis =
+            axisIndex % 2 == 0 ?
+            glm::vec2(1.0 / static_cast<double>(waterMapSource.imgWidth), 0.0) :
+            glm::vec2(0.0, 1.0 / static_cast<double>(waterMapSource.imgHeight));
+          waterTextureInfo2.id = waterMapSource.textureID;
+          waterTextureInfo2.activeID = waterMapSource.activeTextureID;
+          uniformArgs.width = waterMapSource.imgWidth;
+          uniformArgs.height = waterMapSource.imgHeight;
+          waterMapTarget.activate();
+          glViewport(0, 0, uniformArgs.width, uniformArgs.height);
+          glClear(GL_COLOR_BUFFER_BIT);
+          waterWavesMesh.draw(uniformArgs);
+          waterMapTarget.deactivate();
+
+          // Set terrain water map
           terrainWaterTextureInfo.id = waterMapTarget.textureID;
           terrainWaterTextureInfo.activeID = waterMapTarget.activeTextureID;
         }
 
-        // Render
+
+        // Render terrain
         uniformArgs.width = state.width;
         uniformArgs.height = state.height;
         glViewport(0, 0, uniformArgs.width, uniformArgs.height);

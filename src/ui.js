@@ -175,6 +175,12 @@ const handleMouseMove = function(evt) {
   let ypos = evt.clientY / canv.height;
   */
 
+  if(document.pointerLockElement === canvas ||
+    document.mozPointerLockElement === canvas) {
+  } else {
+    return;
+  }
+
   let xoffset = evt.movementX / canv.width;
   let yoffset = evt.movementY / canv.height;
   /*
