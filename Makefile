@@ -11,7 +11,7 @@ dist/index.html: src/index.html
 #	cp src/ui.js dist/ui.js
 
 dist/index.js: cpp/main.cpp shaders/* images/*
-	emcc -Icpp/glm cpp/main.cpp \
+	emcc -Icpp/glm -Icpp/imgui cpp/imgui/imgui.cpp cpp/main.cpp \
 		-std=c++17 -s WASM=1 -s USE_WEBGL2=1 -s ALLOW_MEMORY_GROWTH=1 \
 		-s TOTAL_MEMORY=128MB \
 		--preload-file images/ --preload-file shaders/ \

@@ -2,6 +2,7 @@
 
 precision mediump float;
 uniform float u_time;
+uniform float u_tick;
 uniform vec3 u_light;
 uniform sampler2D u_heightmap;
 uniform sampler2D u_watermap;
@@ -20,7 +21,8 @@ vec4 exchange(float ground, float height, vec2 c, vec2 offset) {
 	float nbHeight = nbWater.x;
 	float diff = (nbGround.x + nbHeight) - (ground + height);
 	float value = clamp(diff * 0.5 * 0.65, -height * 0.5, nbHeight * 0.5);
-	return vec4(value, offset * value, (nbGround.x + nbHeight) * 0.25);
+	//float value = clamp(diff * 0.5, -height * 0.5, nbHeight * 0.5);
+	return vec4(value, offset * value, nbHeight * 0.5);
 }
 
 void main() {
@@ -44,43 +46,54 @@ void main() {
 	
 	float v = water.w;
 
-	float transfer = 0.1 * diff.x + v;
+	// float timeDelta = u_tick * 60.0 * 2.0;
+	float timeDelta = 1.0;
+	float transfer = timeDelta * 0.1 * diff.x + v;
+	//transfer = clamp(transfer, -height * 0.5, diff.w);
 	//transfer = clamp(transfer, diff.x < 0.0 ? diff.x : -height * 0.5, diff.x > 0.0 ? diff.x : 0.0);
 
 	//float newHeight = height + v;
 	float newHeight = height + transfer;
 
 	// Rain
-	newHeight += 0.0000002;
+	//newHeight += 0.0000002;
+	newHeight += 0.0000005;
 	if (abs(sin(u_time)) < 0.01) {
-		//newHeight += 0.001;
+		//newHeight += 0.01;
 	}
 
 	// Waterfall
 	float time = 1.0 * u_time;
-	if (distance(v_uv, vec2(0.5)) < 0.01) {
-		//newHeight += sin(time);
+	float f = 0.01;
+	if (distance(v_uv, vec2(0.5)) < 0.1 && abs(sin(u_time)) < 0.5) {
+		newHeight += f * (sin(20.0 * time) + 0.0) * 1.0;
 	}
 	if (distance(v_uv, vec2(0.5) + 0.25 * vec2(cos(time), sin(time))) < 0.01) {
-		newHeight += 0.001;
+		newHeight += f;
 	}
 
 	// Sink at edges
-	if (max(abs(v_uv.x - 0.5), abs(v_uv.y - 0.5)) > 0.49 ||
+	if (max(abs(v_uv.x - 0.5), abs(v_uv.y - 0.5)) > 0.49
 			// Sink at center
-			distance(v_uv, vec2(0.5)) < 0.01) {
+			//distance(v_uv, vec2(0.5)) < 0.01) {
+		) {
 		//newHeight = 0.0;
 		//v = 0.0;
 	}
 	// Evaporate
 	newHeight *= 0.999997;
-
-	// Velocity update
-	v = mix(v, newHeight - height, 1.0);
-	//v *= 0.95;
+	newHeight *= 0.9999;
 
 	// Clamp
 	newHeight = clamp(newHeight, 0.0, 1.0);
+
+	// Velocity update
+	v = mix(v, newHeight - height, 1.0);
+	v *= 0.995;
+	//v *= 0.99995;
+
+	// Clamp
+	v = clamp(v, -1.0, 1.0);
 
   gl_FragColor = vec4(vec3(newHeight, water.yz + u_axis * (newHeight - height)), v);
   //gl_FragColor = vec4(1.0);

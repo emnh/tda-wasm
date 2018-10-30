@@ -220,7 +220,7 @@ public:
   double tick;
   double elapsed;
   Camera camera;
-  glm::vec3 light = glm::vec3(0.0, -1000.0, 0.0);
+  glm::vec3 light = glm::vec3(-1.0, -2.0, 1.0);
   glm::vec2 axis;
 };
 
@@ -243,6 +243,7 @@ public:
 	const char* fragmentSourceFile;
   GLuint shaderProgram;
   GLint u_time;
+  GLint u_tick;
   GLint u_resolution;
   GLint u_light;
   GLint u_eye;
@@ -258,6 +259,7 @@ public:
 
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
+    glUniform1f(u_tick, uniformArgs.tick);
     glUniform2f(u_resolution, uniformArgs.width, uniformArgs.height);
     glUniform3fv(u_light, 1, glm::value_ptr(uniformArgs.light));
     glUniform3fv(u_eye, 1, glm::value_ptr(uniformArgs.camera.cameraPos));
@@ -307,6 +309,7 @@ public:
 
     // Get uniform locations
     u_time = glGetUniformLocation(shaderProgram, "u_time");
+    u_tick = glGetUniformLocation(shaderProgram, "u_tick");
     u_resolution = glGetUniformLocation(shaderProgram, "u_resolution");
     u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_eye = glGetUniformLocation(shaderProgram, "u_eye");
@@ -756,7 +759,10 @@ int main()
         }
 
         // Water
-        for (int axisIndex = 0; axisIndex < 2; axisIndex++) {
+        int iterCount = 2; // + 2 * int(1.0 * uniformArgs.tick * 60.0);
+        uniformArgs.tick /= (float) iterCount;
+        //cerr << "iterCount: " << iterCount << endl;
+        for (int axisIndex = 0; axisIndex < iterCount; axisIndex++) {
           currentWaterRT = (currentWaterRT + 1) % 2;
           RenderTarget& waterMapSource = currentWaterRT == 0 ? waterMap1 : waterMap2;
           RenderTarget& waterMapTarget = currentWaterRT == 0 ? waterMap2 : waterMap1;
@@ -774,6 +780,7 @@ int main()
           waterMapMesh.draw(uniformArgs);
           waterMapTarget.deactivate();
         }
+        uniformArgs.tick *= (float) iterCount;
 
         // Water waves
         for (int axisIndex = 0; axisIndex < 1; axisIndex++) {

@@ -16,6 +16,8 @@ in vec3 v_waterNormal;
 
 out vec4 fragmentColor;
 
+const float eps = 1.0e-10;
+
 #define gl_FragColor fragmentColor
 
 // BEGIN ASHIMA
@@ -280,6 +282,21 @@ vec4 getWaterHeightAndNormal(vec2 pos) {
   return ret;
 }
 
+vec3 getWaterNormal(vec2 pos) {
+  // TODO: waterResolution as uniform
+  float waterResolution = 256.0;
+  vec2 dx = vec2(1.0 / waterResolution, 0.0);
+  vec2 dy = vec2(0.0, 1.0 / waterResolution);
+  vec2 ndx = dx; //vec2(0.0);
+  vec2 ndy = dy; //vec2(0.0);
+  float x = getHeightAndNormal(pos + dx).x + getWaterHeightAndNormal(pos + dx).x;
+  x -= getHeightAndNormal(pos - ndx).x + getWaterHeightAndNormal(pos - ndx).x;
+  float y = getHeightAndNormal(pos + dy).x + getWaterHeightAndNormal(pos + dy).x;
+  y -= getHeightAndNormal(pos - ndy).x + getWaterHeightAndNormal(pos - ndy).x;
+  vec3 normal = normalize(vec3(2.0 * x, -4.0 * heightMultiplier / waterResolution, 2.0 * y));
+  return normal;
+}
+
 float getTotalHeight(vec2 pos) {
   return getHeightAndNormal(pos).x + getWaterHeightAndNormal(pos).x;
 }
@@ -290,9 +307,8 @@ vec3 getGroundTexture(vec2 uv) {
   return mix(col1, col2, 0.5);
 }
 
-vec3 getWaterLight(vec3 lightDir, vec3 normal) {
+vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye) {
   //vec3 eye = u_eye;
-  vec3 eye = vec3(0.0, 20.0, 0.0);
   //vec3 eye = vec3(v_pos.x, 40.0, v_pos.z);
   //vec3 eye = vec3(1000.0, 0.0, 1000.0);
   //vec3 eyeDir = vec3(0.0, -1.0, 0.0);
@@ -302,43 +318,62 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal) {
   //float refractIndex = 1.0 / (1.0 / 1.333);
   float refractIndex = IOR_AIR / IOR_WATER;
 
-  vec3 reflectionDir = normalize(reflect(incomingRay, normal));
+  //vec3 overWaterNormal = vec3(0.0, 1.0, 0.0);
+  vec3 overWaterNormal = normal;
+  vec3 reflectionDir = normalize(reflect(incomingRay, overWaterNormal));
   float reflectedLight = dot(reflectionDir, lightDir);
 
   //float diffuseLight = dot(refractionDir, normal);
   //vec3 refractionDir = normalize(refract(lightDir, incomingRay, refractIndex));
   //vec3 refractionDir = refract(incomingRay, normal, refractIndex);
   //vec3 refractionDir = normalize(refract(lightDir, normal, refractIndex));
-  vec3 refractionDir = normalize(refract(incomingRay, vec3(0.0, 1.0, 0.0), refractIndex));
+  //vec3 overWaterNormal = normal;
+  //overWaterNormal = normalize(mix(overWaterNormal, normal, 0.5));
+  vec3 refractionDir = normalize(refract(incomingRay, overWaterNormal, refractIndex));
+  vec3 refractionDirLight = normalize(refract(lightDir, overWaterNormal, refractIndex));
+  //vec3 refractionDir = normalize(refract(incomingRay, normal, refractIndex));
   //float refractedLight = dot(refractionDir2, lightDir);
 
   float wh = v_water.x; // / heightMultiplier;
   float t = wh / refractionDir.y;
   vec3 p = v_pos - abs(t) * refractionDir;
+  vec2 uv = p.xz / 100.0 + 0.5;
   wh /= heightMultiplier;
 
-  vec3 groundNormal = vec3(0.0, 1.0, 0.0);
+  //vec3 groundNormal = vec3(0.0, 1.0, 0.0);
+  vec3 groundNormal = getHeightAndNormal(uv).yzw;
   vec3 bottomLight = normalize(reflect(refractionDir, groundNormal));
+  float t2 = abs(bottomLight.y) / wh;
+  vec3 p2 = p + abs(t2) * bottomLight;
+  vec2 uv2 = p2.xz / 100.0 + 0.5;
+  //vec3 waterNormal = getWaterNormal(uv2);
+  //waterNormal *= -1.0;
   vec3 waterNormal = vec3(0.0, -1.0, 0.0);
   vec3 refractionDir2 = normalize(refract(bottomLight, waterNormal, 1.0 / refractIndex));
   float refractedLight = 1.0 * clamp(dot(refractionDir2, lightDir), 0.0, 1.0);
+  refractedLight += 1.0 * clamp(dot(refractionDir, refractionDirLight), 0.0, 1.0);
+  refractedLight += 1.0 * clamp(dot(bottomLight, refractionDirLight), 0.0, 1.0);
+  refractedLight += 1.0 * clamp(dot(bottomLight, lightDir), 0.0, 1.0);
+  refractedLight *= 0.25;
     
   // TODO: map size 100.0
   vec2 waterVelocity = v_water.yz;
-  vec2 uv = p.xz / 100.0 + 0.5;
   //vec3 col3 = wh > 0.0 ? 5.0 * vec3(0.0, 0.2, 1.0) : vec3(1.0); // texture(u_waterTex, 20.0 * v_uv).rgb;
-  vec3 waterColor = 2.0 * vec3(0.5, 0.5, 1.0);
+  vec3 waterColor = 2.0 * vec3(0.5, 0.5, 2.0);
   //col3 = 0.0 * col3 + col3 * texture(u_tex, (uv + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
   //col3 = 2.0 * col3 * getGroundTexture(uv).rgb; // + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
   waterColor = mix(waterColor, waterColor * 0.2, clamp(pow(wh, 1.0), 0.0, 1.0));
-  vec3 groundColor = normalize(vec3(1.0)) * vec3(length(waterColor));
+  vec3 groundColor = 4.0 * normalize(vec3(1.0)) * vec3(length(waterColor));
   groundColor *= getGroundTexture(uv).rgb; // + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
-  vec3 col3 = 1.0 * mix(groundColor * waterColor, waterColor, clamp(pow(wh, 0.5) / 1.0, 0.0, 1.0));
+  //float occlusion = clamp(pow(wh, 1.0) / pow(1.0 + refractedLight, 10.0), 0.0, 1.0);
+  float occlusion = clamp(pow(wh, refractedLight), 0.0, 1.0);
+  vec3 col3 = 1.0 * mix(groundColor, waterColor, occlusion);
   //
   vec3 sky = 0.5 * vec3(0.5, 0.5, 1.0);
 
   float fresnel = mix(0.5, 1.0, pow(1.0 - dot(normal, -incomingRay), 3.0));
   fresnel *= 0.02;
+  //fresnel *= occlusion;
 
   return mix(col3 * refractedLight, sky * reflectedLight, fresnel);
 }
@@ -350,6 +385,8 @@ vec3 combine(vec3 d, vec3 a) {
 
 vec3 getDiffuse(vec3 normal, bool isWater) {
 
+  //vec3 eye = vec3(0.0, 20.0, 0.0);
+  vec3 eye = u_eye;
   vec3 diffuse = vec3(0.0);
   vec3 diffuseWater = vec3(0.0);
   int maxi = 25;
@@ -379,18 +416,22 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
     float sq = round(sqrt(float(maxi)));
     float lx = mod(float(i), sq) / (sq - 1.0) - 0.5;
     float ly = float(i / int(sq)) / (sq - 1.0) - 0.5;
-    vec3 light = 70.0 * vec3(lx, 0.0, ly);
+    vec3 light = 50.0 * vec3(lx, 0.0, ly);
     //lx = sign(lx) * pow(abs(lx), 0.33);
     //ly = sign(ly) * pow(abs(ly), 0.33);
     // TODO: 100.0 is size of map
     float radius = 15.0;
     //light.y = getTotalHeight(light.xz / 100.0 + 0.5) - radius;
     vec2 uv = light.xz / 100.0 + 0.5;
-    light.y = getHeightAndNormal(uv).x + (getWaterHeightAndNormal(uv).x > 0.0 ? 5.0 : 5.0);
+    //light.y = getHeightAndNormal(uv).x + (getWaterHeightAndNormal(uv).x > 0.0 ? 5.0 : 5.0);
+    light.y = getHeightAndNormal(uv).x; // + 1.0 * radius * (sin(2.0 * u_time + float(i)) + 0.0) * 1.0;
     //vec3 lightdir = 5.0 * 1.41 * 50.0 * rnd1 * vec3(lx, -1.0, ly);
-    vec3 lightdir1 = (v_pos - closestPointOnCircle(light, radius, v_pos));
-    vec3 lightdir2 = v_pos - light;
-    vec3 lightdir = mix(lightdir1, lightdir2, 1.0);
+    //vec3 lightdir1 = (v_pos - closestPointOnCircle(light, radius, v_pos));
+    vec3 closest = closestPointOnCircle(light, radius, v_pos);
+    light.xz = closest.xz;
+    //light = distance(v_pos, light) < distance(v_pos, closest) ? light : closest;
+    vec3 lightdir = v_pos - light;
+    //vec3 lightdir = mix(lightdir1, lightdir2, 1.0);
     //float d = distance(light.xz, v_pos.xz);
     float d = distance(light, v_pos);
     vec3 nlight = normalize(lightdir);
@@ -401,15 +442,17 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
       d;
       */
     d = pow(d / radius, 2.0);
-    d *= 2.0;
+    d *= 4.0;
     //d *= 0.2;
-    float eps = 1.0e-10;
+    d *= radius;
 
-    diffuseWater = combine(diffuseWater, 1.0 * color * getWaterLight(nlight, normal) / (eps + d));
+    float sw = 0.1; //(sin(1.0 * u_time) + 1.0) * 0.5;
+    vec3 tnormal = normalize(vec3(sw, 1.0, sw) * normal);
+    diffuseWater = combine(diffuseWater, 1.0 * color * getWaterLight(nlight, tnormal, eye) / (eps + d));
 
     // diffuse = max(diffuse, 1.0 * color * dot(nlight, normal) / d);
   }
-  maxi = 4;
+  maxi = 2;
   for (int i = 0; i < maxi; i++) {
     float theta = 3.14 * 2.0 * float(i) / float(maxi - 1) + 2.0 * u_time / 5.0;
     float theta2 = theta + 2.0 * atan(v_pos.x, v_pos.z);
@@ -420,18 +463,24 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
     // color = normalize(color);
     vec3 light2 = 50.0 * vec3(cos(theta2), -1.0, sin(theta2));
     float d2 = (sin((atan(light2.x, light2.z) - atan(v_pos.x, v_pos.z))) + 1.0) / 2.0;
-    d2 = pow(1.0 + d2, 100.0);
-    vec3 nlight = normalize(vec3(normal.x, 0.0, normal.z));
+    float rrm = (sin(1.0 * length(v_pos.xz) - 20.0 * u_time) + 1.0) / 4.0;
+    //float rrm = mod(rr, 5.0) > 2.5 ? 1.0 : 0.0;
+    d2 = pow(0.95 + d2 + rrm, 20.0);
+    //vec3 nlight = normalize(vec3(normal.x, 0.0, normal.z));
+    vec3 nlight = normalize(v_pos - vec3(0.0, 0.0, 0.0));
 
-    diffuseWater = combine(diffuseWater, 2.0 * color * getWaterLight(nlight, normal) / (1.0 + d2));
+    diffuseWater = combine(diffuseWater, 2.0 * color * getWaterLight(nlight, normal, eye) / (eps + d2));
     
     // diffuse = max(diffuse, 2.0 * color * dot(nlight, normal) / (1.0 + d2));
   }
   //diffuse /= float(maxi);
-  //float intensity = length(v_pos.xz / 50.0) / sqrt(2.0);
-  float intensity = 0.9;
+  float intensity = min(0.1, 1.0 / (eps + length(v_pos.xz / 50.0) / sqrt(2.0)));
+  //float intensity = min(2.0, 1.0 / (eps + distance(v_pos, eye) / 50.0) / sqrt(2.0));
+  //float intensity = 1.0 * (sin(u_time) + 1.0) * 0.5;
+  //float intensity = 2.0;
 
-  diffuseWater = combine(diffuseWater, getWaterLight(normalize(u_light), normal) * intensity);
+  //diffuseWater = combine(diffuseWater, getWaterLight(normalize(eye), normal, eye) * intensity);
+  diffuseWater = combine(diffuseWater, getWaterLight(normalize(u_light), normal, eye) * intensity);
   
   /*
   time = u_time * 1.0;
