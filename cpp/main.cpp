@@ -497,6 +497,7 @@ public:
 	float lightsIntensity = 1.0;
 	float beamIntensity = 1.0;
   float heightMultiplier = 20.0;
+	int refractMethod = 4;
 
   virtual void initTexture() {
     // TODO: addImage function
@@ -528,7 +529,10 @@ public:
         glUniform1f(index, beamIntensity);
     });
     addUniform("u_heightMultiplier", [this](GLint index, UniformArgs& uniformArgs) {
-        glUniform1f(index, this->heightMultiplier);
+        glUniform1f(index, heightMultiplier);
+    });
+    addUniform("u_refractMethod", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1i(index, refractMethod);
     });
 	}
 };
@@ -1008,6 +1012,8 @@ int main()
 					ImGui::SliderFloat("Wave Decay", &waterMapMesh.material.waveDecay, 0.0f, 20.0f);
 					ImGui::SliderFloat("Viscosity", &waterMapMesh.material.viscosity, 0.0f, 1.0f);
 					ImGui::SliderFloat("Water Transfer", &waterMapMesh.material.waterTransfer, 0.0f, 10.0f);
+          ImGui::Combo("Refract Method",
+	        	&terrain.material.refractMethod, "First\0Second\0Third\0Fourth\0Average\0");
           ImGui::End();
         }
 

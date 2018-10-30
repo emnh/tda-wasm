@@ -6,6 +6,7 @@ uniform float u_sunIntensity;
 uniform float u_lightsIntensity;
 uniform float u_beamIntensity;
 uniform float u_heightMultiplier;
+uniform int u_refractMethod;
 uniform vec3 u_light;
 uniform vec3 u_eye;
 uniform sampler2D u_tex;
@@ -352,11 +353,22 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye) {
   //waterNormal *= -1.0;
   vec3 waterNormal = vec3(0.0, -1.0, 0.0);
   vec3 refractionDir2 = normalize(refract(bottomLight, waterNormal, 1.0 / refractIndex));
-  float refractedLight = 1.0 * clamp(dot(refractionDir2, lightDir), 0.0, 1.0);
-  refractedLight += 1.0 * clamp(dot(refractionDir, refractionDirLight), 0.0, 1.0);
-  refractedLight += 1.0 * clamp(dot(bottomLight, refractionDirLight), 0.0, 1.0);
-  refractedLight += 1.0 * clamp(dot(bottomLight, lightDir), 0.0, 1.0);
-  refractedLight *= 0.25;
+	float refractedLight = 0.0;
+	if (u_refractMethod == 0 || u_refractMethod == 4) {
+		refractedLight += 1.0 * clamp(dot(refractionDir2, lightDir), 0.0, 1.0);
+	}
+	if (u_refractMethod == 1 || u_refractMethod == 4) {
+		refractedLight += 1.0 * clamp(dot(refractionDir, refractionDirLight), 0.0, 1.0);
+	}
+	if (u_refractMethod == 2 || u_refractMethod == 4) {
+		refractedLight += 1.0 * clamp(dot(bottomLight, refractionDirLight), 0.0, 1.0);
+	}
+	if (u_refractMethod == 3 || u_refractMethod == 4) {
+		refractedLight += 1.0 * clamp(dot(bottomLight, lightDir), 0.0, 1.0);
+	}
+	if (u_refractMethod == 4) {
+		refractedLight *= 0.25;
+	}
     
   // TODO: map size 100.0
   vec2 waterVelocity = v_water.yz;
