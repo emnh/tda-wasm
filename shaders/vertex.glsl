@@ -10,6 +10,7 @@ out vec3 v_nor;
 out vec4 v_water;
 out vec3 v_waterNormal;
 uniform float u_time;
+uniform float u_heightMultiplier;
 uniform vec3 u_light;
 uniform vec3 u_eye;
 uniform mat4 u_mvp;
@@ -18,19 +19,17 @@ uniform sampler2D u_watermap;
 
 // TODO: rename file
 
-const float heightMultiplier = 20.0;
-
 vec4 getHeightAndNormal(vec2 pos) {
   vec4 ret = texture(u_heightmap, pos);
-  ret.xz *= heightMultiplier;
+  ret.xz *= u_heightMultiplier;
   ret.yzw = normalize(ret.yzw);
   return ret;
 }
 
 vec4 getWaterHeightAndNormal(vec2 pos) {
   vec4 ret = texture(u_watermap, pos);
-  ret *= heightMultiplier;
-  //ret.xz *= heightMultiplier;
+  ret *= u_heightMultiplier;
+  //ret.xz *= u_heightMultiplier;
   //ret.yzw = normalize(ret.yzw);
   return ret;
 }
@@ -50,7 +49,7 @@ vec3 getWaterNormal(vec2 pos) {
   x -= getHeightAndNormal(pos - ndx).x + getWaterHeightAndNormal(pos - ndx).x;
   float y = getHeightAndNormal(pos + dy).x + getWaterHeightAndNormal(pos + dy).x;
   y -= getHeightAndNormal(pos - ndy).x + getWaterHeightAndNormal(pos - ndy).x;
-  vec3 normal = normalize(vec3(2.0 * x, -4.0 * heightMultiplier / waterResolution, 2.0 * y));
+  vec3 normal = normalize(vec3(2.0 * x, -4.0 * u_heightMultiplier / waterResolution, 2.0 * y));
   return normal;
 }
 

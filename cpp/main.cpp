@@ -454,14 +454,38 @@ public:
 };
 
 class WaterMaterial : public Material {
+public:
+  float centralTurbulence1 = 1.0;
+  float centralTurbulence2 = 1.0;
+  float rain = 1.0;
+  float evaporation = 1.0;
+
   virtual void initRest() {
     addUniform("u_axis", [](GLint index, UniformArgs& uniformArgs) {
         glUniform2fv(index, 1, glm::value_ptr(uniformArgs.axis));
+    });
+    addUniform("u_centralTurbulence1", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, centralTurbulence1);
+    });
+    addUniform("u_centralTurbulence2", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, centralTurbulence2);
+    });
+    addUniform("u_rain", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, rain);
+    });
+    addUniform("u_evaporation", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, evaporation);
     });
   }
 };
 
 class TerrainMaterial : public Material {
+public:
+	float sunIntensity = 1.0;
+	float lightsIntensity = 1.0;
+	float beamIntensity = 1.0;
+  float heightMultiplier = 20.0;
+
   virtual void initTexture() {
     // TODO: addImage function
     int imgWidth;
@@ -480,6 +504,21 @@ class TerrainMaterial : public Material {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
   }
+
+	virtual void initRest() {
+    addUniform("u_sunIntensity", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, sunIntensity);
+    });
+    addUniform("u_lightsIntensity", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, lightsIntensity);
+    });
+    addUniform("u_beamIntensity", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, beamIntensity);
+    });
+    addUniform("u_heightMultiplier", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, this->heightMultiplier);
+    });
+	}
 };
 
 class CubeMaterial : public Material {
@@ -520,10 +559,10 @@ class CopyMaterial : public Material {
   }
 };
 
-
+template <class TMaterial>
 class Mesh {
 public:
-  Material material;
+  TMaterial material;
   Geometry geometry;
 
   GLuint vao;
@@ -600,14 +639,13 @@ public:
     glDrawElements(GL_TRIANGLES, 3 * geometry.indexCount, GL_UNSIGNED_INT, (void*) 0);
   }
 
-  Mesh(const char* vertexSourceFile, const char* fragmentSourceFile, Material& material) {
+  Mesh(const char* vertexSourceFile, const char* fragmentSourceFile) {
     geometry = loadGeometry();
     
     // Create material
     material.vertexSourceFile = vertexSourceFile;
     material.fragmentSourceFile = fragmentSourceFile;
     material.init();
-    this->material = material;
 
     init();
   }
@@ -723,16 +761,14 @@ int main()
           var sz = 100.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
         });
-    TerrainMaterial terrainMaterial;
-    Mesh terrain("shaders/vertex.glsl", "shaders/fragment.glsl", terrainMaterial);
+    Mesh<TerrainMaterial> terrain("shaders/vertex.glsl", "shaders/fragment.glsl");
 
     // Create sphere
     EM_ASM({
           const THREE = window.UI.THREE;
           window.UI.geometry = new THREE.SphereBufferGeometry(2, 32, 20);
         });
-    Material material;
-    Mesh sphere("shaders/defaultVertex.glsl", "shaders/defaultFragment.glsl", material);
+    Mesh<Material> sphere("shaders/defaultVertex.glsl", "shaders/defaultFragment.glsl");
 
     // Create skybox
     EM_ASM({
@@ -740,8 +776,7 @@ int main()
           var sz = 100000.0;
           window.UI.geometry = new THREE.BoxBufferGeometry(sz, sz, sz, 1, 1, 1);
         });
-    CubeMaterial cubeMaterial;
-    Mesh skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl", cubeMaterial);
+    Mesh<CubeMaterial> skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl");
     
     // Create height map render target
     int sz = 256;
@@ -754,8 +789,7 @@ int main()
           var sz = 2.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 1, 1);
         });
-    Material heightMapMaterial;
-    Mesh heightMapMesh("shaders/heightmapVertex.glsl", "shaders/heightmapFragment.glsl", heightMapMaterial);
+    Mesh<Material> heightMapMesh("shaders/heightmapVertex.glsl", "shaders/heightmapFragment.glsl");
     
     // Create water map render targets
     RenderTarget waterMap1(sz, sz);
@@ -765,8 +799,7 @@ int main()
 
     // Create water map mesh
     // Uses same geometry
-    WaterMaterial waterMapMaterial;
-    Mesh waterMapMesh("shaders/watermapVertex.glsl", "shaders/watermapFragment.glsl", waterMapMaterial);
+    Mesh<WaterMaterial> waterMapMesh("shaders/watermapVertex.glsl", "shaders/watermapFragment.glsl");
     waterMapMesh.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
     int waterIndex =
       waterMapMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
@@ -774,8 +807,7 @@ int main()
     
     // Create water wave mesh
     // Uses same geometry
-    WaterMaterial waterWavesMaterial;
-    Mesh waterWavesMesh("shaders/watermapVertex.glsl", "shaders/waterwavesFragment.glsl", waterWavesMaterial);
+    Mesh<WaterMaterial> waterWavesMesh("shaders/watermapVertex.glsl", "shaders/waterwavesFragment.glsl");
     waterWavesMesh.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
     int waterIndex2 =
       waterWavesMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
@@ -783,8 +815,7 @@ int main()
 
     // Create copy mesh
     // Uses same geometry
-    Material copyMaterial;
-    Mesh fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl", copyMaterial);
+    Mesh<Material> fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl");
     //fullscreenQuad.material.setTexture("u_tex", heightMap.textureID, heightMap.activeTextureID);
     fullscreenQuad.material.setTexture("u_tex", waterMap1.textureID, waterMap1.activeTextureID);
 
@@ -945,13 +976,23 @@ int main()
         // 2. Show another simple window, this time using an explicit Begin/End pair
         if (true || g_show_another_window)
         {
-          const int w = 200;
-          const int h = 100;
+          const int w = 350;
+          const int h = state.height / 2;
           ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiSetCond_FirstUseEver);
           ImGui::SetNextWindowPos(ImVec2(state.width - w - 5, 5), ImGuiSetCond_FirstUseEver);
           ImGui::Begin("Configuration", &g_show_another_window);
+          ImGui::Text("Right click + WASD to move camera");
           ImGui::Text("Avg %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 					ImGui::PlotLines("Frame Times", ticks, IM_ARRAYSIZE(ticks));
+          ImGui::Text("Uniforms");
+					ImGui::SliderFloat("Sun", &terrain.material.sunIntensity, 0.01f, 10.0f);
+					ImGui::SliderFloat("Lights", &terrain.material.lightsIntensity, 0.01f, 20.0f);
+					ImGui::SliderFloat("Beam Light", &terrain.material.beamIntensity, 0.01f, 2.0f);
+					ImGui::SliderFloat("Map Height", &terrain.material.heightMultiplier, 0.01f, 100.0f);
+					ImGui::SliderFloat("Centre Wave 1", &waterMapMesh.material.centralTurbulence1, 0.0f, 5.0f);
+					ImGui::SliderFloat("Centre Wave 2", &waterMapMesh.material.centralTurbulence2, 0.0f, 5.0f);
+					ImGui::SliderFloat("Rain", &waterMapMesh.material.rain, 0.0f, 100.0f);
+					ImGui::SliderFloat("Evaporation", &waterMapMesh.material.evaporation, 0.0f, 20.0f);
           ImGui::End();
         }
 

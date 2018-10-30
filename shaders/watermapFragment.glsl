@@ -3,6 +3,10 @@
 precision mediump float;
 uniform float u_time;
 uniform float u_tick;
+uniform float u_centralTurbulence1;
+uniform float u_centralTurbulence2;
+uniform float u_rain;
+uniform float u_evaporation;
 uniform vec3 u_light;
 uniform sampler2D u_heightmap;
 uniform sampler2D u_watermap;
@@ -57,7 +61,7 @@ void main() {
 
 	// Rain
 	//newHeight += 0.0000002;
-	newHeight += 0.0000005;
+	newHeight += 0.0000005 * u_rain;
 	if (abs(sin(u_time)) < 0.01) {
 		//newHeight += 0.01;
 	}
@@ -66,10 +70,10 @@ void main() {
 	float time = 1.0 * u_time;
 	float f = 0.01;
 	if (distance(v_uv, vec2(0.5)) < 0.1 && abs(sin(u_time)) < 0.5) {
-		newHeight += f * (sin(20.0 * time) + 0.0) * 1.0;
+		newHeight += u_centralTurbulence1 * f * (sin(20.0 * time) + 0.0) * 1.0;
 	}
 	if (distance(v_uv, vec2(0.5) + 0.25 * vec2(cos(time), sin(time))) < 0.01) {
-		newHeight += f;
+		newHeight += u_centralTurbulence2 * f;
 	}
 
 	// Sink at edges
@@ -81,8 +85,11 @@ void main() {
 		//v = 0.0;
 	}
 	// Evaporate
+	/*
 	newHeight *= 0.999997;
 	newHeight *= 0.9999;
+	*/
+	newHeight *= (1.0 - 0.0001 * u_evaporation);
 
 	// Clamp
 	newHeight = clamp(newHeight, 0.0, 1.0);
