@@ -818,6 +818,8 @@ int main()
     //ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
     ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
     */
+		int tickIndex = 0;
+		float ticks[60];
 
     loop = [&]
     {
@@ -844,6 +846,9 @@ int main()
         uniformArgs.lastTime = uniformArgs.now;
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
+	
+				ticks[tickIndex] = uniformArgs.tick;
+				tickIndex = (tickIndex + 1) % 60;
 
         // Enable depth test
         glEnable(GL_DEPTH_TEST);
@@ -946,6 +951,7 @@ int main()
           ImGui::SetNextWindowPos(ImVec2(state.width - w - 5, 5), ImGuiSetCond_FirstUseEver);
           ImGui::Begin("Configuration", &g_show_another_window);
           ImGui::Text("Avg %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+					ImGui::PlotLines("Frame Times", ticks, IM_ARRAYSIZE(ticks));
           ImGui::End();
         }
 
