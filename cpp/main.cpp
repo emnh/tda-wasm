@@ -31,6 +31,7 @@ using namespace std;
 
 #include <imgui.h>
 #include "imgui_impl_sdl.h"
+#include "imgui_impl_opengl3.h"
 #include <stdio.h>
 #include <SDL.h>
 #include <SDL_opengl.h>
@@ -689,7 +690,16 @@ int main()
     SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
     
     // Setup ImGui binding
-    ImGui_ImplSdl_Init(g_window);
+    //ImGui_ImplSdl_Init(g_window);
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGui_ImplSDL2_InitForOpenGL(g_window, glcontext);
+    const char* glsl_version = "#version 300 es";
+    ImGui_ImplOpenGL3_Init(glsl_version);
+    ImGui::StyleColorsDark();
+    io.Fonts->AddFontDefault();
+    io.Fonts->Build();
 
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE sdlContext = emscripten_webgl_get_current_context();
     
@@ -820,12 +830,14 @@ int main()
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSdl_ProcessEvent(&event);
-            if (event.type == SDL_QUIT)
+            ImGui_ImplSDL2_ProcessEvent(&event);
+            if (event.type == SDL_QUIT) {
                 g_done = true;
+						}
         }
-        ImGui_ImplSdl_NewFrame(g_window);
-
+				ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplSDL2_NewFrame(g_window);
+        ImGui::NewFrame();
 
         uniformArgs.now = emscripten_get_now();
         uniformArgs.tick = (uniformArgs.now - uniformArgs.lastTime) / 1000.0;
@@ -941,7 +953,7 @@ int main()
         if (false && g_show_test_window)
         {
             ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
-            ImGui::ShowTestWindow(&g_show_test_window);
+            ImGui::ShowTestWindow();
         }
 
         // Rendering
@@ -950,6 +962,8 @@ int main()
         //glClear(GL_COLOR_BUFFER_BIT);
         glClear(GL_DEPTH_BUFFER_BIT);
         ImGui::Render();
+        //SDL_GL_MakeCurrent(g_window, glcontext);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
         SDL_GL_SwapWindow(g_window);
         first = false;
     };
@@ -957,7 +971,8 @@ int main()
     emscripten_set_main_loop(main_loop, 0, true);
 
     // Cleanup
-    ImGui_ImplSdl_Shutdown();
+	  ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL2_Shutdown();
     SDL_GL_DeleteContext(glcontext);
     SDL_DestroyWindow(g_window);
     SDL_Quit();
