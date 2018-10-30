@@ -175,8 +175,8 @@ const handleMouseMove = function(evt) {
   let ypos = evt.clientY / canv.height;
   */
 
-  if(document.pointerLockElement === canvas ||
-    document.mozPointerLockElement === canvas) {
+  if(document.pointerLockElement === canv ||
+    document.mozPointerLockElement === canv) {
   } else {
     return;
   }
@@ -207,7 +207,6 @@ const handleMouseEnterLeave = function(evt) {
 */
 
 function allReady() {
-  resize();
   window.addEventListener("optimizedResize", resize);
   window.addEventListener("keydown", handleKeyDown, true);
   window.addEventListener("keyup", handleKeyUp, true);
@@ -215,10 +214,14 @@ function allReady() {
   //canv.addEventListener("mouseenter", handleMouseEnterLeave, true);
   //canv.addEventListener("mouseleave", handleMouseEnterLeave, true);
   canv.addEventListener("mousedown", function(evt) {
-    canv.requestPointerLock();
-  }, true);
+    console.log("button", evt.button);
+    if (evt.button === 2) {
+      canv.requestPointerLock();
+    }
+  }, false);
   canv.addEventListener("wheel", function(evt) {
     _addZoom(evt.deltaY * 45.0 / (100.0 * 20.0));
   }, true);
 }
 window.UI.allReady = allReady;
+window.UI.resize = resize;

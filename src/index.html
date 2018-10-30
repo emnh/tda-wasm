@@ -14,9 +14,23 @@ body {
 </head>
 
 <body>
-    <!-- Create the canvas that the C++ code will draw into -->
+    <!-- Create the canvases that the C++ code will draw into -->
     <canvas id="canvas" oncontextmenu="event.preventDefault()"></canvas>
     <script src="ui.js"></script>
+    <script>
+      var Module = {
+        canvas: (function() {
+          var canvas = document.getElementById('canvas');
+
+          // As a default initial behavior, pop up an alert when webgl context is lost. To make your
+          // application robust, you may want to override this behavior before shipping!
+          // See http://www.khronos.org/registry/webgl/specs/latest/1.0/#5.15.2
+          canvas.addEventListener("webglcontextlost", function(e) { alert('WebGL context lost. You will need to reload the page.'); e.preventDefault(); }, false);
+
+          return canvas;
+        })()
+      };
+    </script>
     <script src="index.js"></script>
     <p>Click the canvas to change the background color.</p>
 </body>

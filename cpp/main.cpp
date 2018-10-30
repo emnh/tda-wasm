@@ -19,7 +19,36 @@
 #include <glm/gtc/matrix_transform.hpp> // glm::translate, glm::rotate, glm::scale, glm::perspective
 #include <glm/gtc/type_ptr.hpp> // glm::value_ptr
 
+#include <imgui.h>
+
 using namespace std;
+
+
+// BEGIN IMGUI STUFF
+
+
+// ImGui - standalone example application for SDL2 + OpenGL ES 2 + Emscripten
+
+#include <imgui.h>
+#include "imgui_impl_sdl.h"
+#include <stdio.h>
+#include <SDL.h>
+#include <SDL_opengl.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#endif
+
+bool g_done = false;
+SDL_Window* g_window;
+bool g_show_test_window = true;
+bool g_show_another_window = false;
+ImVec4 g_clear_color = ImColor(114, 144, 154);
+
+
+
+// END IMGUI STUFF
+
 
 const int maxTexturesPerMaterial = 10;
 const int maxUniformsPerMaterial = 20;
@@ -45,6 +74,7 @@ extern "C" void EMSCRIPTEN_KEEPALIVE
 setSize(float w, float h) {
   state.width = w;
   state.height = h;
+  SDL_SetWindowSize(g_window, state.width, state.height);
 }
 
 extern "C" void EMSCRIPTEN_KEEPALIVE
@@ -197,8 +227,8 @@ public:
         cameraPos -= cameraSpeed * cameraFront;
     }
     if (state.movingUp) {
-      cerr << "cameraPos: " << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << endl;
-      cerr << "pitch, yaw: " << state.pitch << " " << state.yaw << endl;
+      //cerr << "cameraPos: " << cameraPos.x << " " << cameraPos.y << " " << cameraPos.z << endl;
+      //cerr << "pitch, yaw: " << state.pitch << " " << state.yaw << endl;
       cameraPos += cameraSpeed * cameraFront;
     }
     if (state.movingLeft) {
@@ -227,6 +257,7 @@ public:
 class TextureInfo {
 public:
   GLuint id;
+  GLint type;
   GLuint activeID;
   GLint u_texture;
 };
@@ -268,6 +299,8 @@ public:
     }
     for (int i = 0; i < textureCount; i++) {
       glUniform1i(textures[i].u_texture, textures[i].activeID);
+      glActiveTexture(GL_TEXTURE0 + textures[i].activeID);
+      glBindTexture(textures[i].type, textures[i].id);
     }
     glm::mat4 mvp = uniformArgs.camera.getMVP();
     glUniformMatrix4fv(u_mvp, 1, GL_FALSE, glm::value_ptr(mvp));
@@ -329,6 +362,7 @@ public:
     TextureInfo& ti = textures[index];
     ti.id = id;
     ti.activeID = activeID;
+    ti.type = GL_TEXTURE_2D;
 
     // Get texture uniform
     glUseProgram(shaderProgram);
@@ -351,6 +385,7 @@ public:
 
     // Get texture uniform
     ti.u_texture = glGetUniformLocation(shaderProgram, uniform);
+    ti.type = type;
 
     // Create one OpenGL texture
     glGenTextures(1, &ti.id);
@@ -634,6 +669,31 @@ public:
 int main()
 {
     EM_ASM(UI.allReady());
+
+    // Setup SDL
+    if (SDL_Init(SDL_INIT_VIDEO) != 0)
+    {
+        printf("Error: %s\n", SDL_GetError());
+        return -1;
+    }
+
+    // Setup window
+    SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+    SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
+    SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
+    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 2);
+    SDL_DisplayMode current;
+    SDL_GetCurrentDisplayMode(0, &current);
+    g_window = SDL_CreateWindow("Tower Defense: Analysis", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 200, 200, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
+    SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
+    
+    // Setup ImGui binding
+    ImGui_ImplSdl_Init(g_window);
+
+    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE sdlContext = emscripten_webgl_get_current_context();
+    
+    EM_ASM(UI.resize());
     
     // Context configurations
     EmscriptenWebGLContextAttributes attrs;
@@ -643,9 +703,9 @@ int main()
     attrs.antialias = 1;
     attrs.majorVersion = 2;
     attrs.minorVersion = 0;
-    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context;
-    context = emscripten_webgl_create_context("canvas", &attrs);
-    emscripten_webgl_make_context_current(context);
+    EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = sdlContext;
+    //context = emscripten_webgl_create_context("canvas2", &attrs);
+    //emscripten_webgl_make_context_current(context);
 
     // Create terrain
     EM_ASM({
@@ -730,22 +790,55 @@ int main()
     uniformArgs.lastTime = uniformArgs.startTime;
     int currentWaterRT = 0;
     
-    // Enable depth test
-    glEnable(GL_DEPTH_TEST);
-    // Accept fragment if it closer to the camera than the former one
-    glDepthFunc(GL_LESS);
     // Set clear color
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     bool first = true;
 
+    // Setup UI
+    
+    //char buf[100];
+    /*
+    float f;
+    ImGui::Text("Hello, world %d", 123);
+    if (ImGui::Button("Save"))
+    {
+        // do stuff
+    }
+    //ImGui::InputText("string", buf, IM_ARRAYSIZE(buf));
+    ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+    */
+
     loop = [&]
     {
+        /*
+        emscripten_webgl_make_context_current(sdlContext);
+        main_loop2();
+        emscripten_webgl_make_context_current(context);
+        */
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            ImGui_ImplSdl_ProcessEvent(&event);
+            if (event.type == SDL_QUIT)
+                g_done = true;
+        }
+        ImGui_ImplSdl_NewFrame(g_window);
+
+
         uniformArgs.now = emscripten_get_now();
         uniformArgs.tick = (uniformArgs.now - uniformArgs.lastTime) / 1000.0;
         uniformArgs.lastTime = uniformArgs.now;
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
+
+        // Enable depth test
+        glEnable(GL_DEPTH_TEST);
+        // Accept fragment if it closer to the camera than the former one
+        glDepthFunc(GL_LESS);
+        // Disable blend, ImgUI enables it
+        glDisable(GL_BLEND);
 
         // Height map
         if (first) {
@@ -813,14 +906,61 @@ int main()
         glViewport(0, 0, uniformArgs.width, uniformArgs.height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
-        //sphere.draw(uniformArgs);
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFunc(GL_ZERO, GL_ZERO);
         skybox.draw(uniformArgs);
+        //sphere.draw(uniformArgs);
         //fullscreenQuad.draw(uniformArgs);
         
+        // 1. Show a simple window
+        // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
+        /*
+        {
+            static float f = 0.0f;
+            ImGui::Text("Hello, world!");
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+            ImGui::ColorEdit3("clear color", (float*)&g_clear_color);
+            if (ImGui::Button("Test Window")) g_show_test_window ^= 1;
+            if (ImGui::Button("Another Window")) g_show_another_window ^= 1;
+        }
+        */
+
+        // 2. Show another simple window, this time using an explicit Begin/End pair
+        if (true || g_show_another_window)
+        {
+          const int w = 200;
+          const int h = 100;
+          ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiSetCond_FirstUseEver);
+          ImGui::SetNextWindowPos(ImVec2(state.width - w - 5, 5), ImGuiSetCond_FirstUseEver);
+          ImGui::Begin("Configuration", &g_show_another_window);
+          ImGui::Text("Avg %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+          ImGui::End();
+        }
+
+        // 3. Show the ImGui test window. Most of the sample code is in ImGui::ShowTestWindow()
+        if (false && g_show_test_window)
+        {
+            ImGui::SetNextWindowPos(ImVec2(650, 20), ImGuiSetCond_FirstUseEver);
+            ImGui::ShowTestWindow(&g_show_test_window);
+        }
+
+        // Rendering
+        glViewport(0, 0, (int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
+        //glClearColor(g_clear_color.x, g_clear_color.y, g_clear_color.z, g_clear_color.w);
+        //glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        ImGui::Render();
+        SDL_GL_SwapWindow(g_window);
         first = false;
     };
 
     emscripten_set_main_loop(main_loop, 0, true);
 
-    return EXIT_SUCCESS;
+    // Cleanup
+    ImGui_ImplSdl_Shutdown();
+    SDL_GL_DeleteContext(glcontext);
+    SDL_DestroyWindow(g_window);
+    SDL_Quit();
+
+    return 0;
 }
