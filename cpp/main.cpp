@@ -459,6 +459,9 @@ public:
   float centralTurbulence2 = 1.0;
   float rain = 1.0;
   float evaporation = 1.0;
+  float waveDecay = 1.0;
+  float viscosity = 0.0;
+  float waterTransfer = 1.0;
 
   virtual void initRest() {
     addUniform("u_axis", [](GLint index, UniformArgs& uniformArgs) {
@@ -475,6 +478,15 @@ public:
     });
     addUniform("u_evaporation", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1f(index, evaporation);
+    });
+    addUniform("u_waveDecay", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, waveDecay);
+    });
+    addUniform("u_viscosity", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, viscosity);
+    });
+    addUniform("u_waterTransfer", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, waterTransfer);
     });
   }
 };
@@ -986,13 +998,16 @@ int main()
 					ImGui::PlotLines("Frame Times", ticks, IM_ARRAYSIZE(ticks));
           ImGui::Text("Uniforms");
 					ImGui::SliderFloat("Sun", &terrain.material.sunIntensity, 0.01f, 10.0f);
-					ImGui::SliderFloat("Lights", &terrain.material.lightsIntensity, 0.01f, 20.0f);
+					ImGui::SliderFloat("Lights", &terrain.material.lightsIntensity, 0.0f, 20.0f);
 					ImGui::SliderFloat("Beam Light", &terrain.material.beamIntensity, 0.01f, 2.0f);
 					ImGui::SliderFloat("Map Height", &terrain.material.heightMultiplier, 0.01f, 100.0f);
 					ImGui::SliderFloat("Centre Wave 1", &waterMapMesh.material.centralTurbulence1, 0.0f, 5.0f);
 					ImGui::SliderFloat("Centre Wave 2", &waterMapMesh.material.centralTurbulence2, 0.0f, 5.0f);
 					ImGui::SliderFloat("Rain", &waterMapMesh.material.rain, 0.0f, 100.0f);
 					ImGui::SliderFloat("Evaporation", &waterMapMesh.material.evaporation, 0.0f, 20.0f);
+					ImGui::SliderFloat("Wave Decay", &waterMapMesh.material.waveDecay, 0.0f, 20.0f);
+					ImGui::SliderFloat("Viscosity", &waterMapMesh.material.viscosity, 0.0f, 1.0f);
+					ImGui::SliderFloat("Water Transfer", &waterMapMesh.material.waterTransfer, 0.0f, 10.0f);
           ImGui::End();
         }
 

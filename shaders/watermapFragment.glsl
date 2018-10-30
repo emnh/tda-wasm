@@ -7,6 +7,9 @@ uniform float u_centralTurbulence1;
 uniform float u_centralTurbulence2;
 uniform float u_rain;
 uniform float u_evaporation;
+uniform float u_viscosity;
+uniform float u_waveDecay;
+uniform float u_waterTransfer;
 uniform vec3 u_light;
 uniform sampler2D u_heightmap;
 uniform sampler2D u_watermap;
@@ -52,7 +55,7 @@ void main() {
 
 	// float timeDelta = u_tick * 60.0 * 2.0;
 	float timeDelta = 1.0;
-	float transfer = timeDelta * 0.1 * diff.x + v;
+	float transfer = timeDelta * u_waterTransfer * 0.1 * diff.x + v;
 	//transfer = clamp(transfer, -height * 0.5, diff.w);
 	//transfer = clamp(transfer, diff.x < 0.0 ? diff.x : -height * 0.5, diff.x > 0.0 ? diff.x : 0.0);
 
@@ -95,8 +98,9 @@ void main() {
 	newHeight = clamp(newHeight, 0.0, 1.0);
 
 	// Velocity update
-	v = mix(v, newHeight - height, 1.0);
-	v *= 0.995;
+	v = mix(v, newHeight - height, 1.0 - u_viscosity);
+	//v *= 0.995;
+	v *= (1.0 - 0.005 * u_waveDecay);
 	//v *= 0.99995;
 
 	// Clamp
