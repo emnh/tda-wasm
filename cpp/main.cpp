@@ -493,11 +493,12 @@ public:
 
 class TerrainMaterial : public Material {
 public:
-	float sunIntensity = 0.0;
+	float sunIntensity = 0.7;
 	float lightsIntensity = 1.0;
 	float beamIntensity = 1.0;
   float heightMultiplier = 20.0;
 	int refractMethod = 1;
+	int numLights = 9;
 	float lightRadius = 15.0;
 	float waterNormalFactor = 0.0;
 	float fresnel = 0.02;
@@ -539,6 +540,9 @@ public:
     });
     addUniform("u_refractMethod", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1i(index, refractMethod);
+    });
+    addUniform("u_numLights", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1i(index, numLights);
     });
     addUniform("u_lightRadius", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1f(index, lightRadius);
@@ -1036,6 +1040,7 @@ int main()
 					};
           ImGui::Text("Uniforms");
 					ImGui::SliderFloat("Sun", &terrain.material.sunIntensity, 0.01f, 10.0f);
+					ImGui::SliderInt("Light Count", &terrain.material.numLights, 0, 100);
 					ImGui::SliderFloat("Lights", &terrain.material.lightsIntensity, 0.0f, 20.0f);
 					ImGui::SliderFloat("Light Radius", &terrain.material.lightRadius, 0.0f, 30.0f);
 					ImGui::SliderFloat("Beam Light", &terrain.material.beamIntensity, 0.01f, 2.0f);

@@ -11,6 +11,7 @@ uniform float u_waterNormalFactor;
 uniform float u_fresnel;
 uniform float u_occlusion;
 uniform int u_refractMethod;
+uniform int u_numLights;
 uniform vec2 u_mapSize;
 uniform vec3 u_light;
 uniform vec3 u_eye;
@@ -359,7 +360,7 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
   vec3 eye = u_eye;
   vec3 diffuse = vec3(0.0);
   vec3 diffuseWater = vec3(0.0);
-  int maxi = 25;
+  int maxi = u_numLights;
   float time = u_time * 0.5;
   float noise1 = snoise(vec2(0.0, time));
   float noise2 = snoise(vec2(1234.5234, time));
