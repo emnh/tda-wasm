@@ -52,7 +52,7 @@ ImVec4 g_clear_color = ImColor(114, 144, 154);
 
 
 const int maxTexturesPerMaterial = 10;
-const int maxUniformsPerMaterial = 20;
+const int maxUniformsPerMaterial = 30;
 
 class State {
 public:
@@ -493,11 +493,17 @@ public:
 
 class TerrainMaterial : public Material {
 public:
-	float sunIntensity = 1.0;
+	float sunIntensity = 0.0;
 	float lightsIntensity = 1.0;
 	float beamIntensity = 1.0;
   float heightMultiplier = 20.0;
-	int refractMethod = 4;
+	int refractMethod = 1;
+	float lightRadius = 15.0;
+	float waterNormalFactor = 0.0;
+	float fresnel = 0.02;
+	float occlusion = 1.0;
+	// TODO: use this in geometry creation instead of constant
+	glm::vec2 mapSize = glm::vec2(100.0, 100.0); 
 
   virtual void initTexture() {
     // TODO: addImage function
@@ -533,6 +539,21 @@ public:
     });
     addUniform("u_refractMethod", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1i(index, refractMethod);
+    });
+    addUniform("u_lightRadius", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, lightRadius);
+    });
+    addUniform("u_waterNormalFactor", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, waterNormalFactor);
+    });
+    addUniform("u_fresnel", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, fresnel);
+    });
+    addUniform("u_occlusion", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, occlusion);
+    });
+    addUniform("u_mapSize", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform2fv(index, 1, glm::value_ptr(mapSize));
     });
 	}
 };
@@ -774,6 +795,7 @@ int main()
     // Create terrain
     EM_ASM({
           const THREE = window.UI.THREE;
+					// TODO: pass sz as parameter
           var sz = 100.0;
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
         });
@@ -993,16 +1015,29 @@ int main()
         if (true || g_show_another_window)
         {
           const int w = 350;
-          const int h = state.height / 2;
+          const int h = state.height - 10;
           ImGui::SetNextWindowSize(ImVec2(w, h), ImGuiSetCond_FirstUseEver);
           ImGui::SetNextWindowPos(ImVec2(state.width - w - 5, 5), ImGuiSetCond_FirstUseEver);
           ImGui::Begin("Configuration", &g_show_another_window);
+          ImGui::Text("https://github.com/emnh/tda-wasm");
           ImGui::Text("Right click + WASD to move camera");
-          ImGui::Text("Avg %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+          ImGui::Text("Avg %.3f ms/frame (%.1f FPS)",
+						1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 					ImGui::PlotLines("Frame Times", ticks, IM_ARRAYSIZE(ticks));
+          if (ImGui::Button("Side View")) {
+            state.pitch = -23.3653;
+            state.yaw = -53.9898;
+            uniformArgs.camera.cameraPos = glm::vec3(-21.5f, 22.8f,  27.5f);
+					};
+          if (ImGui::Button("Top View")) {
+						state.pitch = -89.0;
+            state.yaw = 0.0;
+            uniformArgs.camera.cameraPos = glm::vec3(0.0, 60.0, 0.0);
+					};
           ImGui::Text("Uniforms");
 					ImGui::SliderFloat("Sun", &terrain.material.sunIntensity, 0.01f, 10.0f);
 					ImGui::SliderFloat("Lights", &terrain.material.lightsIntensity, 0.0f, 20.0f);
+					ImGui::SliderFloat("Light Radius", &terrain.material.lightRadius, 0.0f, 30.0f);
 					ImGui::SliderFloat("Beam Light", &terrain.material.beamIntensity, 0.01f, 2.0f);
 					ImGui::SliderFloat("Map Height", &terrain.material.heightMultiplier, 0.01f, 100.0f);
 					ImGui::SliderFloat("Centre Wave 1", &waterMapMesh.material.centralTurbulence1, 0.0f, 5.0f);
@@ -1014,6 +1049,9 @@ int main()
 					ImGui::SliderFloat("Water Transfer", &waterMapMesh.material.waterTransfer, 0.0f, 10.0f);
           ImGui::Combo("Refract Method",
 	        	&terrain.material.refractMethod, "First\0Second\0Third\0Fourth\0Average\0");
+					ImGui::SliderFloat("Water Normal", &terrain.material.waterNormalFactor, 0.0f, 1.0f);
+					ImGui::SliderFloat("Fresnel", &terrain.material.fresnel, 0.0f, 1.0f);
+					ImGui::SliderFloat("Occlusion", &terrain.material.occlusion, 0.0f, 5.0f);
           ImGui::End();
         }
 

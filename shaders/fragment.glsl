@@ -6,7 +6,12 @@ uniform float u_sunIntensity;
 uniform float u_lightsIntensity;
 uniform float u_beamIntensity;
 uniform float u_heightMultiplier;
+uniform float u_lightRadius;
+uniform float u_waterNormalFactor;
+uniform float u_fresnel;
+uniform float u_occlusion;
 uniform int u_refractMethod;
+uniform vec2 u_mapSize;
 uniform vec3 u_light;
 uniform vec3 u_eye;
 uniform sampler2D u_tex;
@@ -217,52 +222,8 @@ float snoise(vec3 v)
 
 // END ASHIMA
 
-
 float rand(vec2 co){
   return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453);
-}
-
-void main2()
-{
-  gl_FragColor.r = gl_FragCoord.x / 640.0;
-  gl_FragColor.g = gl_FragCoord.y / 480.0;
-  gl_FragColor.b = (sin(5.0 * u_time) + 1.0) / 2.0;
-}
-
-void main3( void ) {
-
-  vec2 resolution = vec2(640.0);
-  float time = u_time;
-
-	vec2 position = ( gl_FragCoord.xy / resolution.xy );
-
-	float color = 0.0;
-	color += sin( position.x * cos( time / 15.0 ) * 80.0 ) + cos( position.y * cos( time / 15.0 ) * 10.0 );
-	color += sin( position.y * sin( time / 10.0 ) * 40.0 ) + cos( position.x * sin( time / 25.0 ) * 40.0 );
-	color += sin( position.x * sin( time / 5.0 ) * 10.0 ) + sin( position.y * sin( time / 35.0 ) * 80.0 );
-	color *= sin( time / 10.0 ) * 0.5;
-
-	gl_FragColor = vec4( vec3( color, color * 0.5, sin( color + time / 3.0 ) * 0.75 ), 1.0 );
-
-}
-
-void main4()
-{
-  vec2 resolution = vec2(640.0);
-  float time = u_time;
-
-  vec2 p = v_uv.xy;
-	//vec2 p=(2.0*gl_FragCoord.xy-resolution)/max(resolution.x,resolution.y);
-	for(int i=1;i<50;i++)
-	{
-		vec2 newp=p;
-		float speed = 10.0; // speed control
-		newp.x+=0.6/float(i)*sin(float(i)*p.y+time/(100.0/speed)+0.3*float(i))+1.0;
-		newp.y+=0.6/float(i)*sin(float(i)*p.x+time/(100.0/speed)+0.3*float(i+10))-1.4;
-		p=newp;
-	}
-	vec3 col=vec3(0.5*sin(3.0*p.x)+0.5,0.5*sin(3.0*p.y)+0.5,sin(p.x+p.y));
-	gl_FragColor=vec4(col, 1.0);
 }
 
 vec3 closestPointOnCircle(vec3 C, float R, vec3 P) {
@@ -340,7 +301,7 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye) {
   float wh = v_water.x; // / u_heightMultiplier;
   float t = wh / refractionDir.y;
   vec3 p = v_pos - abs(t) * refractionDir;
-  vec2 uv = p.xz / 100.0 + 0.5;
+  vec2 uv = p.xz / u_mapSize + 0.5;
   wh /= u_heightMultiplier;
 
   //vec3 groundNormal = vec3(0.0, 1.0, 0.0);
@@ -348,7 +309,7 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye) {
   vec3 bottomLight = normalize(reflect(refractionDir, groundNormal));
   float t2 = abs(bottomLight.y) / wh;
   vec3 p2 = p + abs(t2) * bottomLight;
-  vec2 uv2 = p2.xz / 100.0 + 0.5;
+  vec2 uv2 = p2.xz / u_mapSize + 0.5;
   //vec3 waterNormal = getWaterNormal(uv2);
   //waterNormal *= -1.0;
   vec3 waterNormal = vec3(0.0, -1.0, 0.0);
@@ -370,23 +331,18 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye) {
 		refractedLight *= 0.25;
 	}
     
-  // TODO: map size 100.0
   vec2 waterVelocity = v_water.yz;
-  //vec3 col3 = wh > 0.0 ? 5.0 * vec3(0.0, 0.2, 1.0) : vec3(1.0); // texture(u_waterTex, 20.0 * v_uv).rgb;
   vec3 waterColor = 2.0 * vec3(0.5, 0.5, 2.0);
-  //col3 = 0.0 * col3 + col3 * texture(u_tex, (uv + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
-  //col3 = 2.0 * col3 * getGroundTexture(uv).rgb; // + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
   waterColor = mix(waterColor, waterColor * 0.2, clamp(pow(wh, 1.0), 0.0, 1.0));
   vec3 groundColor = 4.0 * normalize(vec3(1.0)) * vec3(length(waterColor));
-  groundColor *= getGroundTexture(uv).rgb; // + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
-  //float occlusion = clamp(pow(wh, 1.0) / pow(1.0 + refractedLight, 10.0), 0.0, 1.0);
-  float occlusion = clamp(pow(wh, refractedLight), 0.0, 1.0);
+  groundColor *= getGroundTexture(uv).rgb;
+  float occlusion = clamp(u_occlusion * pow(wh, refractedLight), 0.0, 1.0);
   vec3 col3 = 1.0 * mix(groundColor, waterColor, occlusion);
   //
   vec3 sky = 0.5 * vec3(0.5, 0.5, 1.0);
 
   float fresnel = mix(0.5, 1.0, pow(1.0 - dot(normal, -incomingRay), 3.0));
-  fresnel *= 0.02;
+  fresnel *= u_fresnel;
   //fresnel *= occlusion;
 
   return mix(col3 * refractedLight, sky * reflectedLight, fresnel);
@@ -433,10 +389,8 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
     vec3 light = 50.0 * vec3(lx, 0.0, ly);
     //lx = sign(lx) * pow(abs(lx), 0.33);
     //ly = sign(ly) * pow(abs(ly), 0.33);
-    // TODO: 100.0 is size of map
-    float radius = 15.0;
-    //light.y = getTotalHeight(light.xz / 100.0 + 0.5) - radius;
-    vec2 uv = light.xz / 100.0 + 0.5;
+    float radius = u_lightRadius;
+    vec2 uv = light.xz / u_mapSize + 0.5;
     //light.y = getHeightAndNormal(uv).x + (getWaterHeightAndNormal(uv).x > 0.0 ? 5.0 : 5.0);
     light.y = getHeightAndNormal(uv).x; // + 1.0 * radius * (sin(2.0 * u_time + float(i)) + 0.0) * 1.0;
     //vec3 lightdir = 5.0 * 1.41 * 50.0 * rnd1 * vec3(lx, -1.0, ly);
@@ -460,7 +414,7 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
     //d *= 0.2;
     d *= radius;
 
-    float sw = 0.1; //(sin(1.0 * u_time) + 1.0) * 0.5;
+    float sw = u_waterNormalFactor; //(sin(1.0 * u_time) + 1.0) * 0.5;
     vec3 tnormal = normalize(vec3(sw, 1.0, sw) * normal);
     diffuseWater =
       combine(diffuseWater, u_lightsIntensity * color * getWaterLight(nlight, tnormal, eye) / (eps + d));
@@ -498,63 +452,19 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
   //diffuseWater = combine(diffuseWater, getWaterLight(normalize(eye), normal, eye) * intensity);
   diffuseWater = combine(diffuseWater, getWaterLight(normalize(u_light), normal, eye) * intensity);
   
-  /*
-  time = u_time * 1.0;
-  float disp = 0.5;
-  float noise4 = (snoise(vec3(10.0 * fract(v_pos.xz * 1.32464 / 100.23542), time)));
-  float noise5 = (snoise(vec3(10.0 * fract(v_pos.xz * 1.52343 / 100.42546) + vec2(14.23, 432.23), time)));
-  vec3 light = mix(v_pos, v_pos + 0.1 * noise5 * vec3(cos(noise4), 0.0, sin(noise4)), disp);
-  float radius = 25.0;
-  float height = getHeightAndNormal(light.xz / 100.0 + 0.5).x + radius;
-  light.y = height;
-  vec3 lightdir = mix(normal, v_pos - light, disp);
-  // lightdir =
-  //   normalize(vec3(mix(normal.x, noise4, disp), mix(normal.y, 0.0, disp), mix(normal.z, noise5, disp)));
-  float d = distance(light, v_pos);
-  vec3 nlight = normalize(lightdir);
-  d = pow(d / radius, 2.0);
-  d *= 0.2;
-  normal = vec3(0.0, 1.0, 0.0);
-  diffuseWater = combine(diffuseWater, getWaterLight(nlight, normal) / (1.0 + d));
-  */
-
   diffuse += dot(normalize(u_light), normal) * intensity;
   return (isWater ? diffuseWater : diffuse);
 }
 
 void main() {
-  //vec3 col = vec3(v_uv.xy, 0.0);
-  //gl_FragColor = vec4(col, 1.0);
-  //float dx = getHeight(v_pos.xy + vec2(delta, 0.0)) - getHeight(v_pos.xy);
-  //float dy = getHeight(v_pos.xy + vec2(0.0, delta)) - getHeight(v_pos.xy);
   vec3 light = normalize(u_light);
-  // float diffuse = dot(light, v_nor) + 0.5;
   vec3 diffuse = getDiffuse(normalize(v_nor), false);
-  //vec4 col2 = texture(u_tex, vec2(rand(v_uv), rand(-v_uv)));
-  //vec3 col1 = texture(u_tex, 10.0 * v_uv).rgb;
-  //vec3 col2 = texture(u_tex, v_uv).rgb;
-  //gl_FragColor = vec4(mix(col1, col2, 0.5) * diffuse, 1.0);
   gl_FragColor.rgb = getGroundTexture(v_uv).rgb * diffuse;
-  //gl_FragColor = vec4(diffuse, 1.0);
   vec2 waterVelocity = v_water.yz;
-  //waterVelocity.x = abs(waterVelocity.x) < 1.0 ? sign(waterVelocity.x) : waterVelocity.x;
-  //waterVelocity.y = abs(waterVelocity.y) < 1.0 ? sign(waterVelocity.y) : waterVelocity.y;
   float wh = v_water.x / u_heightMultiplier;
   if (wh >= 0.0) {
-    vec3 col3 = vec3(0.0, 0.2, 1.0); // texture(u_waterTex, 20.0 * v_uv).rgb;
-    //col3 = vec3(0.0, 0.5, 1.0) * (1.0 + snoise(v_uv + 0.1 * u_time * v_uv * v_water.yz)) / 2.0;
-    col3 = 0.0 * col3 + col3 * texture(u_tex, (v_uv + u_time) * 10.0 * clamp(waterVelocity, -100.0, 100.0)).rgb;
-    //float diffuse2 = dot(light, v_waterNormal) + 0.5;
-    //vec3 diffuse2 = getDiffuse(v_waterNormal);
-    //col3 = (col3 + 1.0) * diffuse / 2.0;
-    
-    // col3 = 10.0 * mix(1.0, 0.5, v_water.x / u_heightMultiplier) * col3 * diffuse;
-    // gl_FragColor = vec4(mix(gl_FragColor.rgb * 1.2, col3, clamp(v_water.x, 0.0, 1.0)), 1.0);
     diffuse = getDiffuse(normalize(v_nor), true);
-    gl_FragColor.rgb = diffuse; // mix(gl_FragColor.rgb, diffuse, min(wh / 0.001, 1.0));
+    gl_FragColor.rgb = diffuse;
   }
-  // float minw = 0.1;
-  // float maxw = 0.3;
-  // gl_FragColor.rgb = mix(gl_FragColor.rgb, diffuse, clamp((wh - minw) / (maxw - minw), 0.0, 1.0));
   gl_FragColor.a = 1.0;
 }

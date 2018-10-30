@@ -11,6 +11,7 @@ out vec4 v_water;
 out vec3 v_waterNormal;
 uniform float u_time;
 uniform float u_heightMultiplier;
+uniform vec2 u_mapSize;
 uniform vec3 u_light;
 uniform vec3 u_eye;
 uniform mat4 u_mvp;
@@ -58,7 +59,7 @@ void main()
   vec3 pos = position.xyz;
   float theta = u_time;
   //vec2 c = uv;
-  vec2 c = pos.xy / 100.0 + 0.5;
+  vec2 c = pos.xy / u_mapSize + 0.5;
   v_uv = c + 0.0 * uv;
   vec4 hmn = getHeightAndNormal(c);
   vec4 wmn = getWaterHeightAndNormal(c);
