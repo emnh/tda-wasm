@@ -1,6 +1,5 @@
 window.UI = {};
 
-
 const THREE = require('three');
 window.UI.THREE = THREE;
 
@@ -214,7 +213,6 @@ function allReady() {
   //canv.addEventListener("mouseenter", handleMouseEnterLeave, true);
   //canv.addEventListener("mouseleave", handleMouseEnterLeave, true);
   canv.addEventListener("mousedown", function(evt) {
-    console.log("button", evt.button);
     if (evt.button === 2) {
       canv.requestPointerLock();
     }
