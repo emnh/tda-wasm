@@ -251,7 +251,7 @@ public:
   double tick;
   double elapsed;
   Camera camera;
-  glm::vec3 light = glm::vec3(-1.0, -2.0, 1.0);
+  glm::vec3 light = glm::vec3(0.0, -1.0, 0.0);
   glm::vec2 axis;
 };
 
@@ -286,8 +286,8 @@ public:
   TextureInfo textures[maxTexturesPerMaterial];
 
   virtual void update(UniformArgs& uniformArgs) {
-    // uniformArgs.light.x = cos(uniformArgs.elapsed);
-    // uniformArgs.light.z = sin(uniformArgs.elapsed);
+    //uniformArgs.light.x = cos(uniformArgs.elapsed);
+    //uniformArgs.light.z = sin(uniformArgs.elapsed);
 
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
@@ -401,6 +401,35 @@ public:
 
   virtual void initTexture() {
   }
+
+  void initSky() {
+    const char* images[] = {
+      "images/Box_Right.jpg",
+      "images/Box_Left.jpg",
+      "images/Box_Top.jpg",
+      "images/Box_Bottom.jpg",
+      "images/Box_Front.jpg",
+      "images/Box_Back.jpg"
+    };
+    GLint targets[] = {
+       GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 
+    };
+    addTexture("u_sky", GL_TEXTURE_CUBE_MAP);
+    for (int j = 0; j < 6; j++) {
+        int imgWidth;
+        int imgHeight;
+        char* imageData = emscripten_get_preloaded_image_data(images[j], &imgWidth, &imgHeight);
+        glTexImage2D(targets[j], 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
+    }
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+  }
   
   void checkShaderError(GLuint shader) {
     GLint isCompiled = 0;
@@ -455,8 +484,8 @@ public:
 
 class WaterMaterial : public Material {
 public:
-  float centralTurbulence1 = 1.0;
-  float centralTurbulence2 = 1.0;
+  float centralTurbulence1 = 0.0;
+  float centralTurbulence2 = 0.0;
   float rain = 1.0;
   float evaporation = 1.0;
   float waveDecay = 1.0;
@@ -493,16 +522,21 @@ public:
 
 class TerrainMaterial : public Material {
 public:
-	float sunIntensity = 0.7;
+	float sunIntensity = 1.5;
 	float lightsIntensity = 1.0;
-	float beamIntensity = 1.0;
+	float beamIntensity = 0.0;
   float heightMultiplier = 20.0;
 	int refractMethod = 1;
-	int numLights = 9;
+	int reflectMethod = 0;
+	int normalMethod = 1;
+	int numLights = 0;
 	float lightRadius = 15.0;
 	float waterNormalFactor = 0.0;
-	float fresnel = 0.02;
+	float fresnel = 1.0;
 	float occlusion = 1.0;
+  float normalMultiplier = 4.0;
+  float normalDifference = 1.0;
+  float debugTest = 1.0;
 	// TODO: use this in geometry creation instead of constant
 	glm::vec2 mapSize = glm::vec2(100.0, 100.0); 
 
@@ -523,6 +557,8 @@ public:
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
     glGenerateMipmap(GL_TEXTURE_2D);
+
+    initSky();
   }
 
 	virtual void initRest() {
@@ -540,6 +576,12 @@ public:
     });
     addUniform("u_refractMethod", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1i(index, refractMethod);
+    });
+    addUniform("u_reflectMethod", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1i(index, reflectMethod);
+    });
+    addUniform("u_normalMethod", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1i(index, normalMethod);
     });
     addUniform("u_numLights", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1i(index, numLights);
@@ -559,38 +601,22 @@ public:
     addUniform("u_mapSize", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform2fv(index, 1, glm::value_ptr(mapSize));
     });
+    addUniform("u_normalMultiplier", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, normalMultiplier);
+    });
+    addUniform("u_normalDifference", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, normalDifference);
+    });
+    addUniform("u_debugTest", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, debugTest);
+    });
 	}
 };
 
 class CubeMaterial : public Material {
   
   virtual void initTexture() {
-    const char* images[] = {
-      "images/Box_Right.jpg",
-      "images/Box_Left.jpg",
-      "images/Box_Top.jpg",
-      "images/Box_Bottom.jpg",
-      "images/Box_Front.jpg",
-      "images/Box_Back.jpg"
-    };
-    GLint targets[] = {
-       GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 
-       GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 
-       GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 
-    };
-    addTexture("u_tex", GL_TEXTURE_CUBE_MAP);
-    for (int j = 0; j < 6; j++) {
-        int imgWidth;
-        int imgHeight;
-        char* imageData = emscripten_get_preloaded_image_data(images[j], &imgWidth, &imgHeight);
-        glTexImage2D(targets[j], 0, GL_RGBA, imgWidth, imgHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, imageData);
-    }
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-    glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+    initSky();
   }
 };
 
@@ -1054,9 +1080,16 @@ int main()
 					ImGui::SliderFloat("Water Transfer", &waterMapMesh.material.waterTransfer, 0.0f, 10.0f);
           ImGui::Combo("Refract Method",
 	        	&terrain.material.refractMethod, "First\0Second\0Third\0Fourth\0Average\0");
+          ImGui::Combo("Reflect Method",
+	        	&terrain.material.reflectMethod, "First\0Second\0Third\0Fourth\0");
 					ImGui::SliderFloat("Water Normal", &terrain.material.waterNormalFactor, 0.0f, 1.0f);
-					ImGui::SliderFloat("Fresnel", &terrain.material.fresnel, 0.0f, 1.0f);
+					ImGui::SliderFloat("Fresnel", &terrain.material.fresnel, 0.0f, 10.0f);
 					ImGui::SliderFloat("Occlusion", &terrain.material.occlusion, 0.0f, 5.0f);
+					ImGui::SliderFloat("Normal Multiplier", &terrain.material.normalMultiplier, 0.0f, 10.0f);
+					ImGui::SliderFloat("Normal Differential", &terrain.material.normalDifference, 0.0f, 1.0f);
+          ImGui::Combo("Normal Method",
+	        	&terrain.material.normalMethod, "Normal\0Sobel\0");
+					ImGui::SliderFloat("Debug / Test", &terrain.material.debugTest, 0.0f, 100.0f);
           ImGui::End();
         }
 
