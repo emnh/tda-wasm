@@ -114,6 +114,19 @@ float getHeight(vec2 pos) {
 	float minValue = (c1 + c2 + c3 + c4 + c5) * -1.0;
 	float maxValue = (c1 + c2 + c3 + c4 + c5) * 1.0;
 	value = 2.0 * (value - minValue) / (maxValue - minValue);
+
+
+	value = 0.0;
+	minValue = 0.0;
+	maxValue = 0.0;
+	for (int i = 0; i < 8; i++) {
+		float f = 0.6;
+		value += pow(f, float(i)) * sn(pos * pow(2.0, float(i)));
+		minValue += pow(f, float(i)) * -1.0;
+		maxValue += pow(f, float(i)) * 1.0;
+	}
+	value = 2.0 * (value - minValue) / (maxValue - minValue);
+
   return value;
 }
 

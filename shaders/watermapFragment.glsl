@@ -93,9 +93,10 @@ void main() {
 	newHeight *= 0.9999;
 	*/
 	newHeight *= (1.0 - 0.0001 * u_evaporation);
+	//newHeight -= 0.0000005 * u_evaporation;
 
 	// Clamp
-	newHeight = clamp(newHeight, 0.0, 1.0);
+	newHeight = clamp(newHeight, 0.0, max(0.0, 2.0 - ground));
 
 	// Velocity update
 	v = mix(v, newHeight - height, 1.0 - u_viscosity);

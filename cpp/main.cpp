@@ -53,6 +53,8 @@ ImVec4 g_clear_color = ImColor(114, 144, 154);
 
 const int maxTexturesPerMaterial = 10;
 const int maxUniformsPerMaterial = 30;
+const float mapSizeX = 100.0;
+const float mapSizeY = 100.0;
 
 class State {
 public:
@@ -286,8 +288,8 @@ public:
   TextureInfo textures[maxTexturesPerMaterial];
 
   virtual void update(UniformArgs& uniformArgs) {
-    //uniformArgs.light.x = cos(uniformArgs.elapsed);
-    //uniformArgs.light.z = sin(uniformArgs.elapsed);
+    // uniformArgs.light.x = cos(uniformArgs.elapsed);
+    // uniformArgs.light.z = sin(uniformArgs.elapsed);
 
     // Set uniforms
     glUniform1f(u_time, uniformArgs.elapsed);
@@ -487,10 +489,10 @@ public:
   float centralTurbulence1 = 0.0;
   float centralTurbulence2 = 0.0;
   float rain = 1.0;
-  float evaporation = 1.0;
+  float evaporation = 0.5;
   float waveDecay = 1.0;
   float viscosity = 0.0;
-  float waterTransfer = 1.0;
+  float waterTransfer = 10.0;
 
   virtual void initRest() {
     addUniform("u_axis", [](GLint index, UniformArgs& uniformArgs) {
@@ -537,8 +539,9 @@ public:
   float normalMultiplier = 4.0;
   float normalDifference = 1.0;
   float debugTest = 1.0;
-	// TODO: use this in geometry creation instead of constant
-	glm::vec2 mapSize = glm::vec2(100.0, 100.0); 
+	glm::vec2 mapSize = glm::vec2(mapSizeX, mapSizeY); 
+  float causticsScale = 0.75;
+  float causticsHeight = 0.15;
 
   virtual void initTexture() {
     // TODO: addImage function
@@ -609,6 +612,12 @@ public:
     });
     addUniform("u_debugTest", [this](GLint index, UniformArgs& uniformArgs) {
         glUniform1f(index, debugTest);
+    });
+    addUniform("u_causticsScale", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, causticsScale);
+    });
+    addUniform("u_causticsHeight", [this](GLint index, UniformArgs& uniformArgs) {
+        glUniform1f(index, causticsHeight);
     });
 	}
 };
@@ -825,10 +834,8 @@ int main()
     // Create terrain
     EM_ASM({
           const THREE = window.UI.THREE;
-					// TODO: pass sz as parameter
-          var sz = 100.0;
-          window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 256, 256);
-        });
+          window.UI.geometry = new THREE.PlaneBufferGeometry($0, $1, 256, 256);
+        }, mapSizeX, mapSizeY);
     Mesh<TerrainMaterial> terrain("shaders/vertex.glsl", "shaders/fragment.glsl");
 
     // Create sphere
@@ -847,7 +854,7 @@ int main()
     Mesh<CubeMaterial> skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl");
     
     // Create height map render target
-    int sz = 256;
+    int sz = 1024;
     RenderTarget heightMap(sz, sz);
     heightMap.init();
 
@@ -883,9 +890,11 @@ int main()
 
     // Create copy mesh
     // Uses same geometry
-    Mesh<Material> fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl");
+    Mesh<CopyMaterial> fullscreenQuad("shaders/copyVertex.glsl", "shaders/copyFragment.glsl");
     //fullscreenQuad.material.setTexture("u_tex", heightMap.textureID, heightMap.activeTextureID);
-    fullscreenQuad.material.setTexture("u_tex", waterMap1.textureID, waterMap1.activeTextureID);
+    int quadTexIndex =
+      fullscreenQuad.material.setTexture("u_tex", waterMap1.textureID, waterMap1.activeTextureID);
+    TextureInfo& quadTextureInfo = fullscreenQuad.material.textures[quadTexIndex];
 
     // Set terrain height map
     terrain.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
@@ -893,7 +902,27 @@ int main()
       terrain.material.setTexture("u_watermap", waterMap1.textureID, waterMap1.activeTextureID);
     TextureInfo& terrainWaterTextureInfo = terrain.material.textures[terrainWaterIndex];
 
+    // Create caustics render target
+    RenderTarget causticsTarget(2048, 2048);
+    causticsTarget.init();
+
+    // Create caustics mesh
+    EM_ASM({
+          const THREE = window.UI.THREE;
+          window.UI.geometry = new THREE.PlaneBufferGeometry($0, $1, 1024, 1024);
+        }, mapSizeX, mapSizeY);
+    Mesh<TerrainMaterial> causticsMesh("shaders/causticsVertex.glsl", "shaders/causticsFragment.glsl");
+    causticsMesh.material.setTexture("u_heightmap", heightMap.textureID, heightMap.activeTextureID);
+    int causticsWaterIndex =
+      causticsMesh.material.setTexture("u_watermap", waterMap1.textureID, waterMap1.activeTextureID);
+    TextureInfo& causticsWaterTextureInfo = terrain.material.textures[causticsWaterIndex];
+    
+    // Set terrain caustics map
+    terrain.material.setTexture("u_caustics", causticsTarget.textureID, causticsTarget.activeTextureID);
+
     // Misc loop vars
+    bool showCaustics = false;
+    bool showHeightmap = false;
     UniformArgs uniformArgs;
     uniformArgs.startTime = emscripten_get_now();
     uniformArgs.lastTime = uniformArgs.startTime;
@@ -1013,20 +1042,51 @@ int main()
           // Set terrain water map
           terrainWaterTextureInfo.id = waterMapTarget.textureID;
           terrainWaterTextureInfo.activeID = waterMapTarget.activeTextureID;
+          // Set caustics water map
+          causticsWaterTextureInfo.id = waterMapTarget.textureID;
+          causticsWaterTextureInfo.activeID = waterMapTarget.activeTextureID;
         }
 
+        // Render caustics
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        causticsTarget.activate();
+        uniformArgs.width = causticsTarget.imgWidth;
+        uniformArgs.height = causticsTarget.imgHeight;
+        glViewport(0, 0, uniformArgs.width, uniformArgs.height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        causticsMesh.draw(uniformArgs);
+        causticsTarget.deactivate();
 
         // Render terrain
+        glBlendEquation(GL_FUNC_ADD);
+        glBlendFunc(GL_ZERO, GL_ZERO);
         uniformArgs.width = state.width;
         uniformArgs.height = state.height;
         glViewport(0, 0, uniformArgs.width, uniformArgs.height);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
-        glBlendEquation(GL_FUNC_ADD);
-        glBlendFunc(GL_ZERO, GL_ZERO);
         skybox.draw(uniformArgs);
+        
+        if (showHeightmap) {
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          //uniformArgs.width = heightMap.imgWidth;
+          //uniformArgs.height = heightMap.imgHeight;
+          quadTextureInfo.id = heightMap.textureID;
+          quadTextureInfo.activeID = heightMap.activeTextureID;
+          fullscreenQuad.draw(uniformArgs);
+        }
+
+        if (showCaustics) {
+          glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+          //uniformArgs.width = causticsTarget.imgWidth;
+          //uniformArgs.height = causticsTarget.imgHeight;
+          quadTextureInfo.id = causticsTarget.textureID;
+          quadTextureInfo.activeID = causticsTarget.activeTextureID;
+          fullscreenQuad.draw(uniformArgs);
+          //causticsMesh.draw(uniformArgs);
+        }
+
         //sphere.draw(uniformArgs);
-        //fullscreenQuad.draw(uniformArgs);
         
         // 1. Show a simple window
         // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
@@ -1090,6 +1150,10 @@ int main()
           ImGui::Combo("Normal Method",
 	        	&terrain.material.normalMethod, "Normal\0Sobel\0");
 					ImGui::SliderFloat("Debug / Test", &terrain.material.debugTest, 0.0f, 100.0f);
+					ImGui::Checkbox("See Height Tex", &showHeightmap);
+					ImGui::Checkbox("See Caustic Tex", &showCaustics);
+					ImGui::SliderFloat("Caustics Scale", &causticsMesh.material.causticsScale, 0.0f, 4.0f);
+					ImGui::SliderFloat("Caustics Height", &causticsMesh.material.causticsHeight, 0.0f, 4.0f);
           ImGui::End();
         }
 

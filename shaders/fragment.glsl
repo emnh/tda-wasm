@@ -22,6 +22,7 @@ uniform samplerCube u_sky;
 uniform sampler2D u_waterTex;
 uniform sampler2D u_heightmap;
 uniform sampler2D u_watermap;
+uniform sampler2D u_caustics;
 in vec2 v_uv;
 in vec3 v_pos;
 in vec4 v_water;
@@ -304,7 +305,7 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye, bool isSky) {
   float t = wh / refractionDir.y;
   vec3 p = v_pos - abs(t) * refractionDir;
   vec2 uv = p.xz / u_mapSize + 0.5;
-
+  
   //vec3 groundNormal = vec3(0.0, 1.0, 0.0);
   vec3 groundNormal = getHeightAndNormal(uv).yzw;
   vec3 bottomLight = normalize(reflect(refractionDir, groundNormal));
@@ -332,6 +333,7 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye, bool isSky) {
 		refractedLight *= 0.25;
 	}
   refractedLight = max(refractedLight, 0.0);
+
   float maxDist = length(vec3(u_mapSize, u_heightMultiplier));
   if (abs(t) > maxDist) {
     //t = 0.0;
@@ -388,7 +390,7 @@ vec3 getWaterLight(vec3 lightDir, vec3 normal, vec3 eye, bool isSky) {
   vec3 waterColor = mix(refractedWaterColor * refractedLight, sky, fresnel);
 
   float groundDiffuse = max(0.0, dot(normal, -lightDir));
-  vec3 terrainColor = mix(groundColor * groundDiffuse, waterColor, normalizedDepth * 2.0);
+  vec3 terrainColor = mix(groundColor * groundDiffuse, waterColor, clamp(normalizedDepth * 10.0, 0.0, 1.0));
 
   return terrainColor;
 }
@@ -480,8 +482,24 @@ vec3 getDiffuse(vec3 normal, bool isWater) {
   //float intensity = min(2.0, 1.0 / (eps + distance(v_pos, eye) / 50.0) / sqrt(2.0));
   //float intensity = 1.0 * (sin(u_time) + 1.0) * 0.5;
   //float intensity = 2.0;
+  
+  vec2 uv2 = v_pos.xz / u_mapSize + 0.5;
+  float caustic = 2.0 * max(0.2, texture(u_caustics, uv2).x);
+  intensity *= (1.0 + caustic);
 
   diffuseWater = combine(diffuseWater, getWaterLight(normalize(u_light), normal, eye, true) * intensity);
+  /*
+  for (float dx = -1.0; dx <= 1.0; dx += 1.0) { 
+    for (float dy = -1.0; dy <= 1.0; dy += 1.0) { 
+      int i = int(dx + 1.0 + (dx + 1.0) * (dy + 1.0));
+      float r = rand(vec2(float(i), -float(i)));
+      float g = rand(vec2(13.423 * float(i), -20.562 * float(i)));
+      float b = rand(vec2(17.8925 * float(i), -4.2593 * float(i)));
+      vec3 light = normalize(vec3(dx, -1.0, dy));
+      diffuseWater = combine(diffuseWater, vec3(r, g, b) * getWaterLight(light, normal, eye, true) * intensity);
+    }
+  }
+  */
   
   return diffuseWater;
 }

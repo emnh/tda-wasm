@@ -14,4 +14,5 @@ out vec4 fragmentColor;
 
 void main() {
   gl_FragColor = texture(u_tex, gl_FragCoord.xy / u_resolution);
+  //gl_FragColor = texture(u_tex, v_uv);
 }
