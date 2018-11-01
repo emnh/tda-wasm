@@ -91,7 +91,7 @@ float snoise(vec2 v)
 // END ASHIMA
 
 float sn(vec2 pos) {
-	return snoise(pos);
+	return abs(snoise(pos));
 }
 
 float getHeight(vec2 pos) {
@@ -111,18 +111,19 @@ float getHeight(vec2 pos) {
     * c4
     + sn(pos * 20.0)
     * c5;
-	float minValue = (c1 + c2 + c3 + c4 + c5) * -1.0;
+	float minValue = (c1 + c2 + c3 + c4 + c5) * -0.0;
 	float maxValue = (c1 + c2 + c3 + c4 + c5) * 1.0;
+
+	/*
 	value = 2.0 * (value - minValue) / (maxValue - minValue);
-
-
 	value = 0.0;
 	minValue = 0.0;
 	maxValue = 0.0;
+	*/
 	for (int i = 0; i < 8; i++) {
 		float f = 0.6;
 		value += pow(f, float(i)) * sn(pos * pow(2.0, float(i)));
-		minValue += pow(f, float(i)) * -1.0;
+		minValue += pow(f, float(i)) * -0.0;
 		maxValue += pow(f, float(i)) * 1.0;
 	}
 	value = 2.0 * (value - minValue) / (maxValue - minValue);

@@ -487,7 +487,7 @@ public:
 class WaterMaterial : public Material {
 public:
   float centralTurbulence1 = 0.0;
-  float centralTurbulence2 = 0.0;
+  float centralTurbulence2 = 0.5;
   float rain = 1.0;
   float evaporation = 0.5;
   float waveDecay = 1.0;
@@ -534,8 +534,8 @@ public:
 	int numLights = 0;
 	float lightRadius = 15.0;
 	float waterNormalFactor = 0.0;
-	float fresnel = 1.0;
-	float occlusion = 1.0;
+	float fresnel = 0.2;
+	float occlusion = 0.5;
   float normalMultiplier = 4.0;
   float normalDifference = 1.0;
   float debugTest = 1.0;
