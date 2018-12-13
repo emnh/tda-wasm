@@ -350,7 +350,7 @@ public:
     u_light = glGetUniformLocation(shaderProgram, "u_light");
     u_eye = glGetUniformLocation(shaderProgram, "u_eye");
     u_mvp = glGetUniformLocation(shaderProgram, "u_mvp");
-    
+
     // Initialize texture
     initTexture();
     initRest();
@@ -414,9 +414,9 @@ public:
       "images/Box_Back.jpg"
     };
     GLint targets[] = {
-       GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X, 
-       GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y, 
-       GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 
+       GL_TEXTURE_CUBE_MAP_POSITIVE_X, GL_TEXTURE_CUBE_MAP_NEGATIVE_X,
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Y, GL_TEXTURE_CUBE_MAP_NEGATIVE_Y,
+       GL_TEXTURE_CUBE_MAP_POSITIVE_Z, GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
     };
     addTexture("u_sky", GL_TEXTURE_CUBE_MAP);
     for (int j = 0; j < 6; j++) {
@@ -432,7 +432,7 @@ public:
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
     glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
   }
-  
+
   void checkShaderError(GLuint shader) {
     GLint isCompiled = 0;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &isCompiled);
@@ -491,7 +491,7 @@ public:
   float rain = 1.0;
   float evaporation = 0.5;
   float waveDecay = 1.0;
-  float viscosity = 0.0;
+  float viscosity = 0.3;
   float waterTransfer = 10.0;
 
   virtual void initRest() {
@@ -539,7 +539,7 @@ public:
   float normalMultiplier = 4.0;
   float normalDifference = 1.0;
   float debugTest = 1.0;
-	glm::vec2 mapSize = glm::vec2(mapSizeX, mapSizeY); 
+	glm::vec2 mapSize = glm::vec2(mapSizeX, mapSizeY);
   float causticsScale = 0.75;
   float causticsHeight = 0.15;
 
@@ -623,7 +623,7 @@ public:
 };
 
 class CubeMaterial : public Material {
-  
+
   virtual void initTexture() {
     initSky();
   }
@@ -657,7 +657,7 @@ public:
     // Create vertex array object
     glGenVertexArrays(1, &vao);
     glBindVertexArray(vao);
-    
+
     // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vbo);
 
@@ -672,28 +672,28 @@ public:
 
     // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vboUV);
-    
+
     // Upload UV data
     glBindBuffer(GL_ARRAY_BUFFER, vboUV);
     glBufferData(GL_ARRAY_BUFFER, geometry.count * 2 * sizeof(GLfloat), geometry.uv, GL_STATIC_DRAW);
 
-    // Specify the layout of the vertex uvs 
+    // Specify the layout of the vertex uvs
     GLint uvAttrib = glGetAttribLocation(material.shaderProgram, "uv");
     glEnableVertexAttribArray(uvAttrib);
     glVertexAttribPointer(uvAttrib, 2, GL_FLOAT, GL_FALSE, 0, 0);
-    
+
     // Create a Vertex Buffer Object and copy the vertex data to it
     glGenBuffers(1, &vboNormal);
-    
+
     // Upload UV data
     glBindBuffer(GL_ARRAY_BUFFER, vboNormal);
     glBufferData(GL_ARRAY_BUFFER, geometry.count * 3 * sizeof(GLfloat), geometry.normal, GL_STATIC_DRAW);
 
-    // Specify the layout of the vertex normals 
+    // Specify the layout of the vertex normals
     GLint normalAttrib = glGetAttribLocation(material.shaderProgram, "normal");
     glEnableVertexAttribArray(normalAttrib);
     glVertexAttribPointer(normalAttrib, 3, GL_FLOAT, GL_FALSE, 0, 0);
-    
+
     // Index
     glGenBuffers(1, &vindex);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vindex);
@@ -717,7 +717,7 @@ public:
 
   Mesh(const char* vertexSourceFile, const char* fragmentSourceFile) {
     geometry = loadGeometry();
-    
+
     // Create material
     material.vertexSourceFile = vertexSourceFile;
     material.fragmentSourceFile = fragmentSourceFile;
@@ -802,7 +802,7 @@ int main()
     SDL_GetCurrentDisplayMode(0, &current);
     g_window = SDL_CreateWindow("Tower Defense: Analysis", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 200, 200, SDL_WINDOW_OPENGL|SDL_WINDOW_RESIZABLE);
     SDL_GLContext glcontext = SDL_GL_CreateContext(g_window);
-    
+
     // Setup ImGui binding
     //ImGui_ImplSdl_Init(g_window);
     IMGUI_CHECKVERSION();
@@ -816,9 +816,9 @@ int main()
     io.Fonts->Build();
 
     EMSCRIPTEN_WEBGL_CONTEXT_HANDLE sdlContext = emscripten_webgl_get_current_context();
-    
+
     EM_ASM(UI.resize());
-    
+
     // Context configurations
     EmscriptenWebGLContextAttributes attrs;
     attrs.explicitSwapControl = 0;
@@ -852,7 +852,7 @@ int main()
           window.UI.geometry = new THREE.BoxBufferGeometry(sz, sz, sz, 1, 1, 1);
         });
     Mesh<CubeMaterial> skybox("shaders/skyVertex.glsl", "shaders/skyFragment.glsl");
-    
+
     // Create height map render target
     int sz = 1024;
     RenderTarget heightMap(sz, sz);
@@ -865,7 +865,7 @@ int main()
           window.UI.geometry = new THREE.PlaneBufferGeometry(sz, sz, 1, 1);
         });
     Mesh<Material> heightMapMesh("shaders/heightmapVertex.glsl", "shaders/heightmapFragment.glsl");
-    
+
     // Create water map render targets
     RenderTarget waterMap1(sz, sz);
     waterMap1.init();
@@ -879,7 +879,7 @@ int main()
     int waterIndex =
       waterMapMesh.material.setTexture("u_watermap", waterMap2.textureID, waterMap2.activeTextureID);
     TextureInfo& waterTextureInfo = waterMapMesh.material.textures[waterIndex];
-    
+
     // Create water wave mesh
     // Uses same geometry
     Mesh<WaterMaterial> waterWavesMesh("shaders/watermapVertex.glsl", "shaders/waterwavesFragment.glsl");
@@ -916,7 +916,7 @@ int main()
     int causticsWaterIndex =
       causticsMesh.material.setTexture("u_watermap", waterMap1.textureID, waterMap1.activeTextureID);
     TextureInfo& causticsWaterTextureInfo = terrain.material.textures[causticsWaterIndex];
-    
+
     // Set terrain caustics map
     terrain.material.setTexture("u_caustics", causticsTarget.textureID, causticsTarget.activeTextureID);
 
@@ -927,14 +927,14 @@ int main()
     uniformArgs.startTime = emscripten_get_now();
     uniformArgs.lastTime = uniformArgs.startTime;
     int currentWaterRT = 0;
-    
+
     // Set clear color
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
     bool first = true;
 
     // Setup UI
-    
+
     //char buf[100];
     /*
     float f;
@@ -974,7 +974,7 @@ int main()
         uniformArgs.lastTime = uniformArgs.now;
         uniformArgs.elapsed = (uniformArgs.now - uniformArgs.startTime) / 1000.0;
         uniformArgs.camera.update(uniformArgs.tick);
-	
+
 				ticks[tickIndex] = uniformArgs.tick;
 				tickIndex = (tickIndex + 1) % 60;
 
@@ -1066,7 +1066,7 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         terrain.draw(uniformArgs);
         skybox.draw(uniformArgs);
-        
+
         if (showHeightmap) {
           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
           //uniformArgs.width = heightMap.imgWidth;
@@ -1087,7 +1087,7 @@ int main()
         }
 
         //sphere.draw(uniformArgs);
-        
+
         // 1. Show a simple window
         // Tip: if we don't call ImGui::Begin()/ImGui::End() the widgets appears in a window automatically called "Debug"
         /*
